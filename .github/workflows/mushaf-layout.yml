@@ -1,0 +1,28 @@
+name: Mushaf layout
+
+# Fetches the Madinah Mushaf page/line layout (tools/fetch_mushaf_layout.py)
+# and publishes it to the data-mushaf-layout branch for review before it is
+# added to the app's assets.
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python tools/fetch_mushaf_layout.py --out mushaf_madani.json
+      - name: Publish to the data-mushaf-layout branch
+        run: |
+          mkdir out && mv mushaf_madani.json out/ && cd out
+          git init -q
+          git checkout -q -b data-mushaf-layout
+          git add .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -qm "Madinah Mushaf layout"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" data-mushaf-layout
