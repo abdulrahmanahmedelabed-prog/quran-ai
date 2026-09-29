@@ -37,7 +37,9 @@ jobs:
       - name: Quantize to q5_0
         run: |
           cmake -S work/whisper.cpp -B work/build -DCMAKE_BUILD_TYPE=Release > /dev/null
-          cmake --build work/build --target quantize -j 4 > /dev/null
+          # The target was renamed whisper-quantize in newer whisper.cpp.
+          cmake --build work/build --target whisper-quantize -j 4 > /dev/null \
+            || cmake --build work/build --target quantize -j 4 > /dev/null
           Q=$(find work/build/bin -name '*quantize*' -type f | head -n 1)
           "$Q" out/ggml-model.bin out/ggml-quran-base.bin q5_0
           ls -l out
