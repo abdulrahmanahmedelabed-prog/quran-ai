@@ -12,42 +12,66 @@ import 'engine.dart';
 class ModelManager {
   ModelManager({required this.modelUrl});
 
-  /// URL of a custom ggml model, e.g. the Quran fine-tuned Whisper converted
-  /// with `tools/convert_model_to_ggml.sh`. Empty selects the generic
-  /// multilingual `base` model.
-  final String modelUrl;
+  /// Whisper fine-tuned on Quran recitation (tarteel-ai/whisper-base-ar-quran),
+  /// converted to ggml by the "Recognition model" workflow and published as a
+  /// release of this repository.
+  static const quranModelUrl =
+      'https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/model-v1/ggml-quran-base.bin';
 
+  /// Used when the Quran model can't be downloaded.
   static const fallbackModel = WhisperModel.base;
 
-  Future<File> _customFile() async {
+  /// A custom model URL from settings; empty uses [quranModelUrl], then
+  /// [fallbackModel].
+  final String modelUrl;
+
+  List<String> get _candidates =>
+      modelUrl.isNotEmpty ? [modelUrl] : [quranModelUrl, fallbackModel.modelUri.toString()];
+
+  Future<File> _fileFor(String url) async {
     final dir = Directory('${(await getApplicationSupportDirectory()).path}/models');
     await dir.create(recursive: true);
-    final name = Uri.parse(modelUrl).pathSegments.lastWhere((s) => s.isNotEmpty, orElse: () => 'model.bin');
-    return File('${dir.path}/${modelUrl.hashCode.toUnsigned(32).toRadixString(16)}-$name');
+    final name = Uri.parse(url).pathSegments.lastWhere((s) => s.isNotEmpty, orElse: () => 'model.bin');
+    return File('${dir.path}/${url.hashCode.toUnsigned(32).toRadixString(16)}-$name');
   }
 
   Future<bool> isDownloaded() async {
-    if (modelUrl.isEmpty) {
-      return File(await WhisperController().getPath(fallbackModel)).exists();
+    try {
+      for (final url in _candidates) {
+        if (await (await _fileFor(url)).exists()) return true;
+      }
+    } catch (_) {
+      // No storage directory (e.g. in tests): treat as not downloaded.
     }
-    return (await _customFile()).exists();
+    return false;
   }
 
-  /// Returns the local model path, downloading it if needed.
-  /// [onProgress] receives values in [0, 1] when the size is known.
-  Future<String> ensure({void Function(double)? onProgress}) async {
-    if (modelUrl.isEmpty) {
-      return WhisperController().downloadModel(fallbackModel);
+  /// Returns the local model path, downloading it on first use.
+  /// [onProgress] receives values in [0, 1] (null while the size is unknown).
+  Future<String> ensure({void Function(double?)? onProgress}) async {
+    for (final url in _candidates) {
+      final file = await _fileFor(url);
+      if (await file.exists()) return file.path;
     }
-    final file = await _customFile();
-    if (await file.exists()) return file.path;
+    RecognitionException? lastError;
+    for (final url in _candidates) {
+      try {
+        return await _download(url, await _fileFor(url), onProgress);
+      } on RecognitionException catch (e) {
+        lastError = e; // try the next candidate
+      }
+    }
+    throw lastError ?? const RecognitionException('تعذر تنزيل نموذج التعرّف.');
+  }
 
+  Future<String> _download(String url, File file, void Function(double?)? onProgress) async {
     final client = http.Client();
     final partial = File('${file.path}.part');
     try {
-      final response = await client.send(http.Request('GET', Uri.parse(modelUrl)));
+      onProgress?.call(null);
+      final response = await client.send(http.Request('GET', Uri.parse(url)));
       if (response.statusCode != 200) {
-        throw RecognitionException('فشل تنزيل النموذج (${response.statusCode}).');
+        throw RecognitionException('فشل تنزيل نموذج التعرّف (${response.statusCode}).');
       }
       final total = response.contentLength ?? 0;
       var received = 0;
@@ -61,7 +85,9 @@ class ModelManager {
       await partial.rename(file.path);
       return file.path;
     } on SocketException {
-      throw const RecognitionException('لا يوجد اتصال بالإنترنت لتنزيل النموذج.');
+      throw const RecognitionException('لا يوجد اتصال بالإنترنت لتنزيل نموذج التعرّف (مرة واحدة فقط).');
+    } on http.ClientException {
+      throw const RecognitionException('انقطع تنزيل نموذج التعرّف، حاول مرة أخرى.');
     } finally {
       client.close();
       if (await partial.exists()) await partial.delete();
@@ -69,11 +95,16 @@ class ModelManager {
   }
 }
 
-/// Runs Whisper on the phone with whisper.cpp: private and works offline.
+/// Runs Whisper on the phone with whisper.cpp: no server needed, works
+/// offline after the model's one-time download.
 class OnDeviceEngine implements RecognitionEngine {
-  OnDeviceEngine({required this.models});
+  OnDeviceEngine({required this.models, this.onModelProgress});
 
   final ModelManager models;
+
+  /// Model download progress, for the first run.
+  final void Function(double?)? onModelProgress;
+
   final Microphone _mic = Microphone();
   final StreamController<String> _transcripts = StreamController.broadcast();
   WhisperLiveSession? _session;
@@ -93,7 +124,10 @@ class OnDeviceEngine implements RecognitionEngine {
 
   @override
   Future<void> start() async {
-    final path = await models.ensure();
+    // Ask for the microphone first so the prompt isn't hidden behind the
+    // model download.
+    await _mic.ensurePermission();
+    final path = await models.ensure(onProgress: onModelProgress);
     final session = _session = await startWhisperLiveSession(
       modelPath: path,
       lang: 'ar',

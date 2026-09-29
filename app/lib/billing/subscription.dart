@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -74,10 +77,41 @@ class SubscriptionService extends ChangeNotifier {
   bool busy = false;
   String? error;
 
-  Tier get tier => Tier.values.asNameMap()[_prefs.getString('tier')] ?? Tier.free;
+  /// SHA-256 of the owner code. Only the hash is in the (public) source.
+  static const _ownerCodeHash = '4d2cc3565067408f2bd4179be4c8ebcaaaaba0dff6ed102c9856aec7c53afde4';
+
+  /// The app owner's account: every feature, every setting, and a tier
+  /// switch to preview what subscribers see.
+  bool get isOwner => _prefs.getBool('owner') ?? false;
+
+  /// Unlocks the owner account if [code] is right.
+  bool unlockOwner(String code) {
+    final ok = sha256.convert(utf8.encode(code.trim().toUpperCase())).toString() == _ownerCodeHash;
+    if (ok) {
+      _prefs.setBool('owner', true);
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  void signOutOwner() {
+    _prefs.remove('owner');
+    _prefs.remove('ownerTier');
+    notifyListeners();
+  }
+
+  Tier get tier => isOwner
+      ? Tier.values.asNameMap()[_prefs.getString('ownerTier')] ?? Tier.plus
+      : Tier.values.asNameMap()[_prefs.getString('tier')] ?? Tier.free;
 
   set _tier(Tier t) {
     _prefs.setString('tier', t.name);
+    notifyListeners();
+  }
+
+  /// Previews another tier as the owner (Plus by default).
+  void setOwnerTier(Tier t) {
+    _prefs.setString('ownerTier', t.name);
     notifyListeners();
   }
 

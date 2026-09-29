@@ -59,13 +59,14 @@ class PaywallPage extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
             ),
-            if (kDebugMode) ...[
+            if (kDebugMode || sub.isOwner) ...[
               const Divider(height: 32),
-              Text('للتجربة فقط (نسخة التطوير)', textAlign: TextAlign.center, style: theme.textTheme.labelMedium),
+              Text(sub.isOwner ? 'حساب المالك: جرّب كما يرى المشترك' : 'للتجربة فقط (نسخة التطوير)',
+                  textAlign: TextAlign.center, style: theme.textTheme.labelMedium),
               SegmentedButton<Tier>(
                 segments: [for (final t in Tier.values) ButtonSegment(value: t, label: Text(t.label))],
                 selected: {sub.tier},
-                onSelectionChanged: (v) => sub.debugSetTier(v.first),
+                onSelectionChanged: (v) => sub.isOwner ? sub.setOwnerTier(v.first) : sub.debugSetTier(v.first),
               ),
             ],
           ],

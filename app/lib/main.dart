@@ -47,7 +47,7 @@ class QuranAiApp extends StatelessWidget {
     return AppScope(
       services: services,
       child: MaterialApp(
-        title: 'تلاوة',
+        title: 'قرآن AI',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),

@@ -29,7 +29,7 @@ class _SurahListPageState extends State<SurahListPage> {
     final services = AppScope.of(context);
     final surahs = services.quran.surahs.where(_matches).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('تلاوة')),
+      appBar: AppBar(title: const Text('قرآن AI')),
       body: Column(
         children: [
           Padding(

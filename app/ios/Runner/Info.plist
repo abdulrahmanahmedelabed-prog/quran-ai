@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>تلاوة</string>
+	<string>قرآن AI</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>يستمع التطبيق إلى تلاوتك ليتابعها وينبهك إلى الأخطاء.</string>
 	<key>NSAppTransportSecurity</key>

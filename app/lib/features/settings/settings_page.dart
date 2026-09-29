@@ -18,6 +18,7 @@ class SettingsPage extends StatelessWidget {
         listenable: Listenable.merge([s, services.subscription]),
         builder: (context, _) => ListView(
           children: [
+            const _OwnerTile(),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Card(
@@ -135,7 +136,7 @@ class SettingsPage extends StatelessWidget {
             ),
             const AboutListTile(
               icon: Icon(Icons.info_outline),
-              applicationName: 'تلاوة',
+              applicationName: 'قرآن AI',
               aboutBoxChildren: [
                 Text('نص المصحف: مشروع تنزيل (tanzil.net). الخط: Amiri Quran (رخصة OFL). '
                     'التلاوات الصوتية: everyayah.com.'),
@@ -255,6 +256,60 @@ class _ModelDownloadTileState extends State<_ModelDownloadTile> {
           ? LinearProgressIndicator(value: _progress)
           : Text(_error ?? 'يُنزَّل مرة واحدة ثم يعمل دون إنترنت'),
       onTap: _downloading || _ready == true ? null : _download,
+    );
+  }
+}
+
+/// Owner sign-in: unlocks every feature (Pro and Plus) without a purchase.
+class _OwnerTile extends StatelessWidget {
+  const _OwnerTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = AppScope.of(context).subscription;
+    if (sub.isOwner) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Card(
+          color: Theme.of(context).colorScheme.tertiaryContainer,
+          child: ListTile(
+            leading: const Icon(Icons.verified_user),
+            title: const Text('حساب المالك'),
+            subtitle: const Text('كل الميزات والإعدادات مفعّلة (برو وبلس)'),
+            trailing: TextButton(onPressed: sub.signOutOwner, child: const Text('خروج')),
+          ),
+        ),
+      );
+    }
+    return ListTile(
+      leading: const Icon(Icons.admin_panel_settings_outlined),
+      title: const Text('دخول المالك'),
+      onTap: () async {
+        final controller = TextEditingController();
+        final code = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('رمز المالك'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              textDirection: TextDirection.ltr,
+              textCapitalization: TextCapitalization.characters,
+              obscureText: true,
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+              FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('دخول')),
+            ],
+          ),
+        );
+        controller.dispose();
+        if (code == null || !context.mounted) return;
+        final ok = sub.unlockOwner(code);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ok ? 'أهلًا بك، تم تفعيل حساب المالك' : 'الرمز غير صحيح')),
+        );
+      },
     );
   }
 }

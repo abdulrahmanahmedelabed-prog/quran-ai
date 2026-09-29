@@ -43,11 +43,12 @@ class AppServices {
 
   ModelManager get modelManager => ModelManager(modelUrl: settings.modelUrl);
 
-  RecognitionEngine createEngine() =>
+  /// [onModelProgress] reports the on-device model's first download.
+  RecognitionEngine createEngine({void Function(double?)? onModelProgress}) =>
       engineFactory?.call() ??
       switch (settings.engine) {
         EngineKind.server => ServerEngine(baseUrl: settings.serverUrl, apiKey: settings.apiKey),
-        EngineKind.onDevice => OnDeviceEngine(models: modelManager),
+        EngineKind.onDevice => OnDeviceEngine(models: modelManager, onModelProgress: onModelProgress),
       };
 }
 

@@ -28,7 +28,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   Win32Window::Point origin(10, 10);
   // Portrait, like the phone layout the app is designed for.
   Win32Window::Size size(560, 960);
-  if (!window.Create(L"\u062A\u0644\u0627\u0648\u0629", origin, size)) {
+  if (!window.Create(L"\u0642\u0631\u0622\u0646 AI", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

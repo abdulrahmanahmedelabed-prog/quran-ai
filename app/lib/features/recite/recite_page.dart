@@ -367,7 +367,11 @@ class _ControlBar extends StatelessWidget {
     final stats = c.tracker.statsFor();
     final String status = switch (c.status) {
       ReciteStatus.idle => c.error ?? (stats.recited == 0 ? 'اضغط على الميكروفون وابدأ التلاوة' : 'اضغط للمتابعة'),
-      ReciteStatus.starting => 'جارٍ التحضير…',
+      ReciteStatus.starting => switch (c.modelProgress) {
+          null => 'جارٍ التحضير…',
+          < 0 => 'جارٍ تنزيل نموذج التعرّف (مرة واحدة فقط)…',
+          final p => 'جارٍ تنزيل نموذج التعرّف (مرة واحدة فقط)… ${arabicNumber((p * 100).round())}٪',
+        },
       ReciteStatus.listening => 'أستمع إليك…',
       ReciteStatus.stopping => 'جارٍ إنهاء الجلسة…',
     };

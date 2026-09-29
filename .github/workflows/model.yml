@@ -1,0 +1,54 @@
+name: Recognition model
+
+# Converts the Quran fine-tuned Whisper model to ggml for whisper.cpp,
+# quantizes it (smaller and faster on phones), and publishes it as the
+# model-v1 release that the app downloads on first use
+# (ModelManager.quranModelUrl in app/lib/asr/on_device_engine.dart).
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Hugging Face model id"
+        default: "tarteel-ai/whisper-base-ar-quran"
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    env:
+      MODEL_ID: ${{ inputs.model || 'tarteel-ai/whisper-base-ar-quran' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Download and convert
+        run: |
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -q transformers huggingface_hub numpy
+          git clone -q --depth 1 https://github.com/ggml-org/whisper.cpp work/whisper.cpp
+          git clone -q --depth 1 https://github.com/openai/whisper work/whisper
+          python -c "from huggingface_hub import snapshot_download; snapshot_download('$MODEL_ID', local_dir='work/model')"
+          mkdir -p out
+          python work/whisper.cpp/models/convert-h5-to-ggml.py work/model work/whisper out
+          ls -l out
+      - name: Quantize to q5_0
+        run: |
+          cmake -S work/whisper.cpp -B work/build -DCMAKE_BUILD_TYPE=Release > /dev/null
+          cmake --build work/build --target quantize -j 4 > /dev/null
+          Q=$(find work/build/bin -name '*quantize*' -type f | head -n 1)
+          "$Q" out/ggml-model.bin out/ggml-quran-base.bin q5_0
+          ls -l out
+      - name: Publish release model-v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view model-v1 > /dev/null 2>&1; then
+            gh release upload model-v1 out/ggml-quran-base.bin --clobber
+          else
+            gh release create model-v1 out/ggml-quran-base.bin \
+              --title "Recognition model v1" \
+              --notes "Whisper fine-tuned on Quran recitation ($MODEL_ID), converted to ggml and quantized (q5_0). Downloaded by the app on first use."
+          fi

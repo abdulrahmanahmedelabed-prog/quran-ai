@@ -84,6 +84,10 @@ class ReciteController extends ChangeNotifier {
   final ValueNotifier<double> level = ValueNotifier(0);
   String lastTranscript = '';
 
+  /// First-run download of the on-device model: null when not downloading,
+  /// -1 while the size is unknown, otherwise progress in [0, 1].
+  double? modelProgress;
+
   /// Memorization mode: words not yet recited are hidden.
   bool hidden;
 
@@ -126,7 +130,10 @@ class ReciteController extends ChangeNotifier {
     error = null;
     status = ReciteStatus.starting;
     notifyListeners();
-    final engine = _engine = services.createEngine();
+    final engine = _engine = services.createEngine(onModelProgress: (p) {
+      modelProgress = p ?? -1;
+      notifyListeners();
+    });
     _transcriptSub = engine.transcripts.listen((text) {
       lastTranscript = text;
       _tracker.update(text);
@@ -135,8 +142,10 @@ class ReciteController extends ChangeNotifier {
     _levelSub = engine.levels.listen((v) => level.value = v);
     try {
       await engine.start();
+      modelProgress = null;
       status = ReciteStatus.listening;
     } catch (e) {
+      modelProgress = null;
       error = e is RecognitionException ? e.message : 'حدث خطأ: $e';
       await _teardown();
       status = ReciteStatus.idle;

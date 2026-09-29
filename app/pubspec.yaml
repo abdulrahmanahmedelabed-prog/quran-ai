@@ -21,6 +21,7 @@ dependencies:
   whisper_ggml: ^2.6.0
   in_app_purchase: ^3.3.1
   just_audio_windows: ^0.2.3
+  crypto: ^3.0.7
 
 # whisper_ggml pulls in FFmpeg (~37 MB of native libraries) only to convert
 # audio files; the app streams PCM, so it is replaced with a stub.

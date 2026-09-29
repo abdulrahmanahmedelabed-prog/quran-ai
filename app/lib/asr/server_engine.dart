@@ -55,6 +55,7 @@ class ServerEngine implements RecognitionEngine {
 
   @override
   Future<void> start() async {
+    await _mic.ensurePermission();
     final ready = Completer<void>();
     try {
       final channel = _channel = WebSocketChannel.connect(_streamUri);

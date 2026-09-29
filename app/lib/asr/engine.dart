@@ -50,10 +50,17 @@ class Microphone {
 
   Stream<double> get levels => _levels.stream;
 
-  Future<Stream<Uint8List>> start() async {
+  /// Asks for microphone access (the system prompt appears on first use).
+  /// Engines call this before any slow setup, so the prompt shows at once.
+  Future<void> ensurePermission() async {
     if (!await _recorder.hasPermission()) {
-      throw const RecognitionException('يرجى السماح للتطبيق باستخدام الميكروفون من الإعدادات.');
+      throw const RecognitionException(
+          'التطبيق يحتاج إذن الميكروفون ليسمع تلاوتك. فعّله من إعدادات الجوال ← التطبيقات ← قرآن AI ← الأذونات.');
     }
+  }
+
+  Future<Stream<Uint8List>> start() async {
+    await ensurePermission();
     final stream = await _recorder.startStream(const RecordConfig(
       encoder: AudioEncoder.pcm16bits,
       sampleRate: sampleRate,

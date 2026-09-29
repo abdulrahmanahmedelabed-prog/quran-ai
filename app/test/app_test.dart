@@ -177,6 +177,22 @@ void main() {
     expect(identical(await services.searchIndex, index), isTrue);
   });
 
+  test('owner account unlocks Plus and can preview other tiers', () async {
+    SharedPreferences.setMockInitialValues({});
+    final sub = SubscriptionService(await SharedPreferences.getInstance());
+    expect(sub.unlockOwner('wrong-code'), isFalse);
+    expect(sub.isOwner, isFalse);
+    expect(sub.tier, Tier.free);
+
+    SharedPreferences.setMockInitialValues({'owner': true});
+    final owner = SubscriptionService(await SharedPreferences.getInstance());
+    expect(owner.tier, Tier.plus);
+    owner.setOwnerTier(Tier.free);
+    expect(owner.tier, Tier.free);
+    owner.signOutOwner();
+    expect(owner.isOwner, isFalse);
+  });
+
   test('a store purchase unlocks its tier', () async {
     SharedPreferences.setMockInitialValues({});
     final store = FakeStore();

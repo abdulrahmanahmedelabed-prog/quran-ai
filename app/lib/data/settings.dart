@@ -26,7 +26,6 @@ class Reciter {
 }
 
 const reciters = [
-  Reciter('Alafasy_128kbps', 'مشاري راشد العفاسي'),
   Reciter('Husary_128kbps', 'محمود خليل الحصري'),
   Reciter('Minshawy_Murattal_128kbps', 'محمد صديق المنشاوي'),
   Reciter('Abdul_Basit_Murattal_192kbps', 'عبد الباسط عبد الصمد'),
@@ -42,8 +41,9 @@ class AppSettings extends ChangeNotifier {
 
   static Future<AppSettings> load() async => AppSettings(await SharedPreferences.getInstance());
 
+  /// On the phone by default: it works without setting up a server.
   EngineKind get engine =>
-      EngineKind.values.asNameMap()[_prefs.getString('engine')] ?? EngineKind.server;
+      EngineKind.values.asNameMap()[_prefs.getString('engine')] ?? EngineKind.onDevice;
   set engine(EngineKind v) => _set('engine', v.name);
 
   /// Base URL of the recognition server, e.g. `https://asr.example.com`.
@@ -70,7 +70,11 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
   }
 
-  String get reciterId => _prefs.getString('reciter') ?? reciters.first.id;
+  String get reciterId {
+    final id = _prefs.getString('reciter');
+    // Falls back if the saved reciter was removed from the list.
+    return reciters.any((r) => r.id == id) ? id! : reciters.first.id;
+  }
   set reciterId(String v) => _set('reciter', v);
 
   /// Start recitation sessions with the text hidden (memorization test).
