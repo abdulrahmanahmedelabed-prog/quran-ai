@@ -7,7 +7,8 @@ plugins {
 android {
     namespace = "com.quranai.quran_ai"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // whisper_ggml needs this NDK; newer NDKs are backward compatible.
+    ndkVersion = "29.0.13113456"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

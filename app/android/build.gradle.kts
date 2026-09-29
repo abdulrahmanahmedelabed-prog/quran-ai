@@ -16,6 +16,9 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
+    apply(from = rootProject.file("plugin-sdk.gradle"))
+}
+subprojects {
     project.evaluationDependsOn(":app")
 }
 

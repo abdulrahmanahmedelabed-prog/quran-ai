@@ -1,0 +1,10 @@
+// Applied to every Flutter plugin project (see build.gradle.kts).
+// whisper_ggml compiles against API 34 while its ffmpeg dependency requires
+// 35+, so raise library compileSdk before AGP locks the DSL.
+plugins.withId('com.android.library') {
+    androidComponents.finalizeDsl { ext ->
+        if (ext.compileSdk == null || ext.compileSdk < 36) {
+            ext.compileSdk = 36
+        }
+    }
+}
