@@ -118,9 +118,10 @@ Future<void> runTour(
   if (!visitPaywall) return;
   Navigator.of(tester.element(find.byType(AyahMarginSheet))).pop();
   await settle();
-  await tester.pageBack();
+  // The system back action, as with Android's back button.
+  await tester.binding.handlePopRoute();
   await settle();
-  await tester.tap(find.text('الإعدادات'));
+  await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('الإعدادات')));
   await settle();
   await tester.tap(find.textContaining('باقتك'));
   await settle();
