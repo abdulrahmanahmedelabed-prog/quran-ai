@@ -4,6 +4,8 @@ import 'dart:typed_data';
 
 import 'package:record/record.dart';
 
+import '../core/recitation_review.dart';
+
 /// Something that listens to the microphone and transcribes recitation.
 abstract class RecognitionEngine {
   /// Full transcript of the session so far; later values may revise the tail.
@@ -11,6 +13,10 @@ abstract class RecognitionEngine {
 
   /// Microphone level in [0, 1] for visual feedback.
   Stream<double> get levels;
+
+  /// Final words with timings, when the recognizer provides them (used to
+  /// check madd lengths). Complete once [stop] has returned.
+  List<TimedWord> get timedWords;
 
   /// Starts listening. Throws [RecognitionException] with a user-facing
   /// message on failure.

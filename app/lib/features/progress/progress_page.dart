@@ -68,13 +68,13 @@ class ProgressPage extends StatelessWidget {
               ],
               if (progress.recentMistakes.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('أخطاء للمراجعة', style: Theme.of(context).textTheme.titleMedium),
+                Text('من الهامش: مواضع للمراجعة', style: Theme.of(context).textTheme.titleMedium),
                 for (final m in progress.recentMistakes.take(30))
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(m.expected, style: const TextStyle(fontFamily: 'AmiriQuran', fontSize: 20)),
-                    subtitle: Text('سورة ${services.quran.surah(m.surah).name} · الآية ${arabicNumber(m.ayah)}'
-                        '${m.heard != null ? ' · سُمِعَت «${m.heard}»' : ''}'),
+                    subtitle: Text(
+                        'سورة ${services.quran.surah(m.surah).name} · الآية ${arabicNumber(m.ayah)} · ${m.description}'),
                     trailing: const Icon(Icons.chevron_left),
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => RecitePage(surah: services.quran.surah(m.surah), fromAyah: m.ayah),

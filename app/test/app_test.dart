@@ -3,8 +3,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:quran_ai/app_scope.dart';
 import 'package:quran_ai/asr/engine.dart';
+import 'package:quran_ai/billing/subscription.dart';
+import 'package:quran_ai/core/recitation_review.dart';
 import 'package:quran_ai/data/progress.dart';
 import 'package:quran_ai/data/quran.dart';
 import 'package:quran_ai/data/settings.dart';
@@ -26,6 +29,9 @@ class FakeEngine implements RecognitionEngine {
   Stream<double> get levels => const Stream.empty();
 
   @override
+  List<TimedWord> timedWords = const [];
+
+  @override
   Future<void> start() async {}
 
   /// Emits the next scripted transcript.
@@ -38,16 +44,59 @@ class FakeEngine implements RecognitionEngine {
   Future<void> dispose() => _transcripts.close();
 }
 
+/// In-memory store: every purchase succeeds.
+class FakeStore implements InAppPurchase {
+  final _purchases = StreamController<List<PurchaseDetails>>.broadcast();
+  int completed = 0;
+
+  void deliver(String productId, PurchaseStatus status) => _purchases.add([
+        PurchaseDetails(
+          productID: productId,
+          verificationData: PurchaseVerificationData(localVerificationData: '', serverVerificationData: '', source: 'test'),
+          transactionDate: '0',
+          status: status,
+        )..pendingCompletePurchase = true,
+      ]);
+
+  @override
+  Stream<List<PurchaseDetails>> get purchaseStream => _purchases.stream;
+
+  @override
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<ProductDetailsResponse> queryProductDetails(Set<String> identifiers) async => ProductDetailsResponse(
+        productDetails: [
+          for (final id in identifiers)
+            ProductDetails(id: id, title: id, description: '', price: '\$1', rawPrice: 1, currencyCode: 'USD'),
+        ],
+        notFoundIDs: const [],
+      );
+
+  @override
+  Future<bool> buyNonConsumable({required PurchaseParam purchaseParam}) async {
+    deliver(purchaseParam.productDetails.id, PurchaseStatus.purchased);
+    return true;
+  }
+
+  @override
+  Future<void> completePurchase(PurchaseDetails purchase) async => completed++;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   final quran = Quran.fromJson(File('assets/quran/quran_uthmani.json').readAsStringSync());
 
-  Future<AppServices> makeServices({FakeEngine? engine}) async {
-    SharedPreferences.setMockInitialValues({});
+  Future<AppServices> makeServices({FakeEngine? engine, Tier tier = Tier.pro}) async {
+    SharedPreferences.setMockInitialValues({'tier': tier.name});
     final prefs = await SharedPreferences.getInstance();
     return AppServices(
       quran: quran,
       settings: AppSettings(prefs),
       progress: ProgressStore(prefs),
+      subscription: SubscriptionService(prefs),
       engineFactory: engine == null ? null : () => engine,
     );
   }
@@ -76,6 +125,70 @@ void main() {
     expect(services.progress.ayah(112, 1)!.lastAccuracy, 1);
     expect(services.progress.streak(), 1);
     c.dispose();
+  });
+
+  test('reading notes go to the margin (Pro); free tier sees progress only', () async {
+    const said = 'قل هو الله احد الله الصمد لم يلد ولم يولد ولم يكن له كفوا احمد';
+    for (final tier in [Tier.pro, Tier.free]) {
+      final engine = FakeEngine([said]);
+      final services = await makeServices(engine: engine, tier: tier);
+      final c = ReciteController(services: services, surah: quran.surah(112));
+      await c.start();
+      final result = (await c.stop())!;
+      expect(result.stats.recited, greaterThan(10));
+      if (tier == Tier.pro) {
+        expect(c.marginNotes(4).reading, 1);
+        expect(c.marginNotes(1).isEmpty, isTrue);
+        expect(result.mistakes, hasLength(1));
+      } else {
+        expect(c.marginNotes(4).isEmpty, isTrue);
+        expect(result.mistakes, isEmpty);
+        expect(services.progress.recentMistakes, isEmpty);
+      }
+      c.dispose();
+    }
+  });
+
+  test('Plus reviews madd lengths from word timings', () async {
+    final words = quran.wordsOf(1);
+    // Every word at 0.12 s per letter: الضالين's six-count madd is cut short.
+    var t = 0.0;
+    final timed = <TimedWord>[];
+    for (final w in words) {
+      final d = w.normalized.length * 0.12;
+      timed.add(TimedWord(w.normalized, t, t + d));
+      t += d + 0.05;
+    }
+    final engine = FakeEngine([words.map((w) => w.normalized).join(' ')])..timedWords = timed;
+    final services = await makeServices(engine: engine, tier: Tier.plus);
+    final c = ReciteController(services: services, surah: quran.surah(1));
+    await c.start();
+    final result = (await c.stop())!;
+    expect(result.tajweedNotes.single.kind, 'shortMadd');
+    expect(c.marginNotes(7).tajweed, 1);
+    expect(services.progress.recentMistakes.single.isTajweed, isTrue);
+    c.dispose();
+  });
+
+  test('a store purchase unlocks its tier', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = FakeStore();
+    final sub = SubscriptionService(await SharedPreferences.getInstance(), store: store);
+    await sub.init();
+    expect(sub.storeAvailable, isTrue);
+    expect(sub.products, hasLength(plans.length));
+    expect(sub.tier, Tier.free);
+
+    await sub.buy(plans.firstWhere((p) => p.tier == Tier.plus));
+    await Future<void>.delayed(Duration.zero);
+    expect(sub.tier, Tier.plus);
+    expect(store.completed, 1);
+
+    // A later Pro restore doesn't downgrade.
+    store.deliver('quranai.pro.monthly', PurchaseStatus.restored);
+    await Future<void>.delayed(Duration.zero);
+    expect(sub.tier, Tier.plus);
+    sub.dispose();
   });
 
   testWidgets('app opens a surah and shows its text', (tester) async {

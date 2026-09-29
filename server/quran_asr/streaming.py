@@ -10,7 +10,7 @@ from hallucinating text on it.
 from __future__ import annotations
 
 from collections import deque
-from typing import Callable
+from typing import Callable, Optional
 
 import numpy as np
 
@@ -21,9 +21,15 @@ Event = dict
 
 class StreamSession:
     def __init__(
-        self, transcribe: Callable[[np.ndarray], str], config: StreamConfig | None = None
+        self,
+        transcribe: Callable[[np.ndarray], str],
+        config: StreamConfig | None = None,
+        transcribe_words: Optional[Callable[[np.ndarray], tuple[str, list[dict]]]] = None,
     ) -> None:
+        """``transcribe_words``, when given, is used for final transcripts so
+        ``final`` events carry per-word timings (seconds since stream start)."""
         self._transcribe = transcribe
+        self._transcribe_words = transcribe_words
         self.cfg = config or StreamConfig()
         fs = self.cfg.frame_samples
         self._remainder = b""
@@ -38,6 +44,9 @@ class StreamSession:
         self._since_partial = 0
         self._last_partial = ""
         self.segment_index = 0
+        # Samples consumed so far, and where the open segment starts.
+        self._position = 0
+        self._segment_start = 0
 
     # -- public API -------------------------------------------------------
 
@@ -81,6 +90,8 @@ class StreamSession:
         return voiced
 
     def _process_frame(self, frame: np.ndarray) -> list[Event]:
+        frame_start = self._position
+        self._position += frame.size
         voiced = self._is_voiced(frame)
         if not self._in_speech:
             if not voiced:
@@ -88,6 +99,7 @@ class StreamSession:
                 return []
             self._in_speech = True
             self._segment = list(self._preroll)
+            self._segment_start = frame_start - sum(f.size for f in self._preroll)
             self._preroll.clear()
             self._speech_samples = 0
             self._silence_samples = 0
@@ -99,6 +111,7 @@ class StreamSession:
             events = self._finalize()
             # Speech continues straight into the next segment.
             self._in_speech = True
+            self._segment_start = frame_start
 
         self._segment.append(frame)
         self._since_partial += frame.size
@@ -134,8 +147,19 @@ class StreamSession:
     def _finalize(self) -> list[Event]:
         events: list[Event] = []
         if self._speech_samples >= self._samples(self.cfg.min_speech_s):
-            text = self._transcribe(self._segment_audio())
-            events.append({"type": "final", "segment": self.segment_index, "text": text})
+            audio = self._segment_audio()
+            event: Event = {"type": "final", "segment": self.segment_index}
+            if self._transcribe_words is not None:
+                text, words = self._transcribe_words(audio)
+                offset = self._segment_start / self.cfg.sample_rate
+                event["words"] = [
+                    {**w, "start": round(w["start"] + offset, 3), "end": round(w["end"] + offset, 3)}
+                    for w in words
+                ]
+            else:
+                text = self._transcribe(audio)
+            event["text"] = text
+            events.append(event)
             self.segment_index += 1
         self._in_speech = False
         self._segment = []

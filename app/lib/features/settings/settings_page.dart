@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app_scope.dart';
 import '../../asr/engine.dart';
 import '../../data/settings.dart';
+import '../subscription/paywall_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -14,9 +15,22 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('الإعدادات')),
       body: ListenableBuilder(
-        listenable: s,
+        listenable: Listenable.merge([s, services.subscription]),
         builder: (context, _) => ListView(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Card(
+                color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+                child: ListTile(
+                  leading: const Icon(Icons.workspace_premium_outlined),
+                  title: Text('باقتك: ${services.subscription.tier.label}'),
+                  subtitle: const Text('برو: ملاحظات القراءة · بلس: والتجويد'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PaywallPage())),
+                ),
+              ),
+            ),
             const _Section('التعرّف على التلاوة'),
             RadioGroup<EngineKind>(
               groupValue: s.engine,
@@ -71,6 +85,18 @@ class SettingsPage extends StatelessWidget {
                 label: s.fontSize.round().toString(),
                 onChanged: (v) => s.fontSize = v,
               ),
+            ),
+            SwitchListTile(
+              title: const Text('إظهار الملاحظات على الكلمات أثناء القراءة'),
+              subtitle: const Text('عند إيقافه تبقى الملاحظات في الهامش فقط حتى لا تقاطعك'),
+              value: s.mistakesInText,
+              onChanged: services.subscription.tier.detectsMistakes ? (v) => s.mistakesInText = v : null,
+            ),
+            SwitchListTile(
+              title: const Text('تلوين أحكام التجويد'),
+              subtitle: const Text('متاح في باقة بلس'),
+              value: s.tajweedColors && services.subscription.tier.detectsTajweed,
+              onChanged: services.subscription.tier.detectsTajweed ? (v) => s.tajweedColors = v : null,
             ),
             SwitchListTile(
               title: const Text('ابدأ في وضع الحفظ'),

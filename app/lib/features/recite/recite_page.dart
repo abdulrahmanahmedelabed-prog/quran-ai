@@ -7,6 +7,7 @@ import '../../app_scope.dart';
 import '../../core/recitation_tracker.dart';
 import '../../data/quran.dart';
 import '../../ui/theme.dart';
+import 'ayah_margin_sheet.dart';
 import 'recite_controller.dart';
 import 'session_summary.dart';
 
@@ -136,10 +137,10 @@ class _RecitePageState extends State<RecitePage> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (context) => _AyahSheet(
-        surah: widget.surah,
+      isScrollControlled: true,
+      builder: (context) => AyahMarginSheet(
+        controller: _c,
         ayah: ayah,
-        words: [for (final i in _wordsByAyah[ayah - 1]) (word: _c.words[i], state: _c.tracker.stateOf(i))],
         onReciteFrom: () {
           Navigator.pop(context);
           _c.restartFrom(ayah);
@@ -157,7 +158,7 @@ class _RecitePageState extends State<RecitePage> {
   Widget build(BuildContext context) {
     final settings = AppScope.of(context).settings;
     return ListenableBuilder(
-      listenable: Listenable.merge([_c, settings]),
+      listenable: Listenable.merge([_c, settings, AppScope.of(context).subscription]),
       builder: (context, _) {
         return Scaffold(
           appBar: AppBar(
@@ -198,69 +199,115 @@ class _RecitePageState extends State<RecitePage> {
     );
   }
 
+
   Widget _buildAyah(int ayah, double fontSize) {
+    final settings = AppScope.of(context).settings;
     final colors = WordColors.of(context);
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final position = _c.position;
     final active = (_c.isListening && _c.currentAyah == ayah) || _playingAyah == ayah;
+    final tier = _c.tier;
+    final showTajweed = tier.detectsTajweed && settings.tajweedColors;
+    // Mistakes stay out of the text while reciting (they go to the margin),
+    // unless the reader asked to see them live. Afterwards they get a quiet
+    // dotted underline for review.
+    final markMistakes = tier.detectsMistakes && (settings.mistakesInText || !_c.isListening);
     final spans = <InlineSpan>[];
     for (final i in _wordsByAyah[ayah - 1]) {
+      final word = _c.words[i];
       final state = _c.tracker.stateOf(i);
       final hidden = _c.hidden && state.status == WordStatus.pending && !_c.peeked.contains(i);
       final isNext = _c.isListening && i == position;
-      final statusColor = colors.forStatus(state.status);
-      Color? background;
-      if (hidden) {
-        background = scheme.surfaceContainerHighest;
-      } else if (isNext) {
-        background = colors.current;
-      } else if (state.status.isMistake) {
-        background = statusColor!.withValues(alpha: 0.12);
+      final recited = state.status != WordStatus.pending;
+      final mistake = state.status.isMistake;
+      final mistakeColor = colors.forStatus(state.status);
+
+      Color? base = recited ? colors.correct : scheme.onSurface;
+      if (state.tentative) base = base.withValues(alpha: 0.7);
+      if (mistake && markMistakes && settings.mistakesInText) base = mistakeColor;
+      final Color? background = hidden ? scheme.surfaceContainerHighest : (isNext ? colors.current : null);
+      final style = TextStyle(
+        color: hidden ? scheme.surfaceContainerHighest : base,
+        backgroundColor: background,
+        decoration: mistake && markMistakes ? TextDecoration.underline : null,
+        decorationStyle: TextDecorationStyle.dotted,
+        decorationColor: mistakeColor,
+      );
+      if (showTajweed && !hidden && word.tajweed.isNotEmpty) {
+        spans.add(TextSpan(style: style, children: _tajweedSpans(word, theme.brightness)));
+      } else {
+        spans.add(TextSpan(text: word.text, style: style));
       }
-      spans.add(TextSpan(
-        text: _c.words[i].text,
-        style: TextStyle(
-          color: hidden
-              ? scheme.surfaceContainerHighest
-              : (state.tentative ? statusColor?.withValues(alpha: 0.7) : statusColor) ?? scheme.onSurface,
-          backgroundColor: background,
-          decoration: state.status.isMistake ? TextDecoration.underline : null,
-          decorationColor: statusColor,
-        ),
-      ));
       spans.add(const TextSpan(text: ' '));
     }
     spans.add(TextSpan(
       text: '﴿${arabicNumber(ayah)}﴾ ',
       style: TextStyle(color: scheme.primary, fontSize: fontSize * 0.8),
     ));
-    return InkWell(
+    final notes = _c.marginNotes(ayah);
+    return Row(
       key: _ayahKeys[ayah],
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => _showAyahSheet(ayah),
-      onLongPress: _c.hidden
-          ? () {
-              for (final i in _wordsByAyah[ayah - 1]) {
-                _c.peek(i);
-              }
-            }
-          : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        margin: const EdgeInsets.symmetric(vertical: 2),
-        decoration: BoxDecoration(
-          color: active ? scheme.primaryContainer.withValues(alpha: 0.35) : null,
-          borderRadius: BorderRadius.circular(12),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _showAyahSheet(ayah),
+            onLongPress: _c.hidden
+                ? () {
+                    for (final i in _wordsByAyah[ayah - 1]) {
+                      _c.peek(i);
+                    }
+                  }
+                : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              decoration: BoxDecoration(
+                color: active ? scheme.primaryContainer.withValues(alpha: 0.35) : null,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text.rich(
+                TextSpan(children: spans),
+                textAlign: TextAlign.justify,
+                textDirection: TextDirection.rtl,
+                style: TextStyle(fontFamily: 'AmiriQuran', fontSize: fontSize, height: 2.1),
+              ),
+            ),
+          ),
         ),
-        child: Text.rich(
-          TextSpan(children: spans),
-          textAlign: TextAlign.justify,
-          textDirection: TextDirection.rtl,
-          style: TextStyle(fontFamily: 'AmiriQuran', fontSize: fontSize, height: 2.1),
+        // The margin: a quiet note count, opened by tapping.
+        SizedBox(
+          width: 30,
+          child: notes.isEmpty
+              ? null
+              : Padding(
+                  padding: EdgeInsets.only(top: fontSize * 0.6),
+                  child: MarginMarker(notes: notes, onTap: () => _showAyahSheet(ayah)),
+                ),
         ),
-      ),
+      ],
     );
+  }
+
+  /// A word split into spans colored by tajweed rule.
+  List<InlineSpan> _tajweedSpans(QuranWord word, Brightness brightness) {
+    final marks = [...word.tajweed]..sort((a, b) => a.start.compareTo(b.start));
+    final out = <InlineSpan>[];
+    var at = 0;
+    for (final m in marks) {
+      if (m.start < at) continue;
+      if (m.start > at) out.add(TextSpan(text: word.text.substring(at, m.start)));
+      out.add(TextSpan(
+        text: word.text.substring(m.start, m.end),
+        style: TextStyle(color: tajweedColor(m.rule, brightness)),
+      ));
+      at = m.end;
+    }
+    if (at < word.text.length) out.add(TextSpan(text: word.text.substring(at)));
+    return out;
   }
 }
 
@@ -343,12 +390,13 @@ class _ControlBar extends StatelessWidget {
                         Text(status,
                             style: TextStyle(
                                 fontSize: 15, color: c.error != null && c.status == ReciteStatus.idle ? scheme.error : null)),
+                        // Only progress is shown while reciting; mistake counts
+                        // wait until the reader stops.
                         if (stats.recited > 0)
                           Wrap(spacing: 10, children: [
-                            _Stat(icon: Icons.check_circle, color: colors.correct, value: stats.correct),
-                            _Stat(icon: Icons.cancel, color: colors.wrong, value: stats.wrong),
-                            _Stat(icon: Icons.redo, color: colors.skipped, value: stats.skipped),
-                            if (stats.hinted > 0) _Stat(icon: Icons.lightbulb, color: colors.hinted, value: stats.hinted),
+                            _Stat(icon: Icons.check_circle, color: colors.correct, value: stats.recited),
+                            if (!c.isListening && c.tier.detectsMistakes && stats.mistakes > 0)
+                              _Stat(icon: Icons.sticky_note_2_outlined, color: colors.skipped, value: stats.mistakes),
                           ]),
                       ],
                     ),
@@ -433,65 +481,3 @@ class _MicButton extends StatelessWidget {
   }
 }
 
-class _AyahSheet extends StatelessWidget {
-  const _AyahSheet({
-    required this.surah,
-    required this.ayah,
-    required this.words,
-    required this.onReciteFrom,
-    required this.onListen,
-  });
-
-  final Surah surah;
-  final int ayah;
-  final List<({QuranWord word, WordState state})> words;
-  final VoidCallback onReciteFrom;
-  final VoidCallback onListen;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = WordColors.of(context);
-    final mistakes = words.where((w) => w.state.status.isMistake).toList();
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('سورة ${surah.name} · الآية ${arabicNumber(ayah)}',
-                style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            if (mistakes.isEmpty)
-              const Text('لا توجد أخطاء مسجلة في هذه الآية.', textAlign: TextAlign.center)
-            else
-              for (final m in mistakes)
-                ListTile(
-                  dense: true,
-                  leading: Icon(Icons.error_outline, color: colors.forStatus(m.state.status)),
-                  title: Text(m.word.text, style: const TextStyle(fontFamily: 'AmiriQuran', fontSize: 22)),
-                  subtitle: Text(switch (m.state.status) {
-                    WordStatus.wrong => 'سُمِعَت: «${m.state.heard ?? ''}»',
-                    WordStatus.skipped => 'لم تُقرأ',
-                    WordStatus.hinted => 'استُعين بتلميح',
-                    _ => '',
-                  }),
-                ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              icon: const Icon(Icons.mic),
-              label: const Text('سمّع من هذه الآية'),
-              onPressed: onReciteFrom,
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.headphones),
-              label: const Text('استمع من هذه الآية'),
-              onPressed: onListen,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

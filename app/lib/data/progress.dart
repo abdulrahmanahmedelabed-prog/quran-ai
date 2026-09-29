@@ -42,10 +42,22 @@ class MistakeRecord {
   final int word;
   final String expected;
 
-  /// `wrong`, `skipped` or `hinted`.
+  /// Reading notes: `wrong`, `skipped` or `hinted`. Tajweed notes (Plus):
+  /// `shortMadd` or `endingVowel`.
   final String kind;
+
+  /// What was heard (wrong words), or the note's text (tajweed notes).
   final String? heard;
   final DateTime at;
+
+  bool get isTajweed => kind == 'shortMadd' || kind == 'endingVowel';
+
+  String get description => switch (kind) {
+        'wrong' => 'سُمِعَت «${heard ?? ''}»',
+        'skipped' => 'لم تُقرأ',
+        'hinted' => 'بمساعدة تلميح',
+        _ => heard ?? '',
+      };
 
   Map<String, dynamic> toJson() => {
         's': surah,

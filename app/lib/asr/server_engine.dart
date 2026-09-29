@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../core/recitation_review.dart';
 import 'engine.dart';
 
 /// Streams microphone audio to the recognition server (see `server/`) over a
@@ -16,6 +17,7 @@ class ServerEngine implements RecognitionEngine {
   final Microphone _mic = Microphone();
   final StreamController<String> _transcripts = StreamController.broadcast();
   final Map<int, String> _finals = {};
+  final Map<int, List<TimedWord>> _finalWords = {};
   final Completer<void> _done = Completer();
   WebSocketChannel? _channel;
   StreamSubscription<List<int>>? _audio;
@@ -27,6 +29,12 @@ class ServerEngine implements RecognitionEngine {
 
   @override
   Stream<double> get levels => _mic.levels;
+
+  @override
+  List<TimedWord> get timedWords {
+    final ids = _finalWords.keys.toList()..sort();
+    return [for (final id in ids) ..._finalWords[id]!];
+  }
 
   String get transcript {
     final ids = _finals.keys.toList()..sort();
@@ -63,7 +71,12 @@ class ServerEngine implements RecognitionEngine {
               _partial = cleanTranscript(event['text'] as String);
               _transcripts.add(transcript);
             case 'final':
-              _finals[event['segment'] as int] = cleanTranscript(event['text'] as String);
+              final segment = event['segment'] as int;
+              _finals[segment] = cleanTranscript(event['text'] as String);
+              final words = event['words'] as List?;
+              if (words != null) {
+                _finalWords[segment] = [for (final w in words) TimedWord.fromJson(w as Map<String, dynamic>)];
+              }
               _transcripts.add(transcript);
             case 'done':
               if (!_done.isCompleted) _done.complete();

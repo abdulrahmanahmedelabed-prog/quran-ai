@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from quran_asr.config import Settings, StreamConfig
 from quran_asr.main import create_app, decode_wav
 from quran_asr.streaming import StreamSession
+from quran_asr.transcriber import words_from_chunks
 
 RATE = 16_000
 
@@ -160,3 +161,34 @@ class TestApi:
         with pytest.raises(WebSocketDisconnect):
             with client.websocket_connect("/v1/stream?key=wrong") as ws:
                 ws.receive_json()
+
+
+class TestWordTimings:
+    def test_final_events_carry_word_times_on_the_stream_timeline(self):
+        def timed(audio: np.ndarray):
+            half = audio.size / RATE / 2
+            return "قل هو", [
+                {"text": "قل", "start": 0.0, "end": half},
+                {"text": "هو", "start": half, "end": 2 * half},
+            ]
+
+        fake = FakeTranscriber()
+        session = StreamSession(fake.transcribe, transcribe_words=timed)
+        audio = np.concatenate([silence(2.0), tone(1.0), silence(1.0)])
+        final = [e for e in feed_in_chunks(session, audio) if e["type"] == "final"][0]
+        assert final["text"] == "قل هو"
+        words = final["words"]
+        # Speech starts at 2.0 s; the segment includes 0.3 s of preroll.
+        assert abs(words[0]["start"] - 1.7) < 0.05
+        assert abs(words[-1]["end"] - 3.0) < 0.05
+
+    def test_words_from_chunks(self):
+        chunks = [
+            {"text": " بسم", "timestamp": (0.0, 0.4)},
+            {"text": " ", "timestamp": (0.4, 0.5)},
+            {"text": " الله", "timestamp": (0.5, None)},
+        ]
+        assert words_from_chunks(chunks, 1.2) == [
+            {"text": "بسم", "start": 0.0, "end": 0.4},
+            {"text": "الله", "start": 0.5, "end": 1.2},
+        ]

@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'asr/engine.dart';
 import 'asr/on_device_engine.dart';
 import 'asr/server_engine.dart';
+import 'billing/subscription.dart';
 import 'core/ayah_search.dart';
 import 'data/progress.dart';
 import 'data/quran.dart';
@@ -10,11 +11,18 @@ import 'data/settings.dart';
 
 /// App-wide services, available to every widget via [AppScope.of].
 class AppServices {
-  AppServices({required this.quran, required this.settings, required this.progress, this.engineFactory});
+  AppServices({
+    required this.quran,
+    required this.settings,
+    required this.progress,
+    required this.subscription,
+    this.engineFactory,
+  });
 
   final Quran quran;
   final AppSettings settings;
   final ProgressStore progress;
+  final SubscriptionService subscription;
 
   /// Overrides engine creation (used by tests).
   final RecognitionEngine Function()? engineFactory;

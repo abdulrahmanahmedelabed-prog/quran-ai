@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/recitation_tracker.dart';
+import '../core/tajweed.dart';
 
 const _seed = Color(0xFF0F766E);
 
@@ -54,6 +55,26 @@ class WordColors {
         WordStatus.hinted => hinted,
         WordStatus.pending => null,
       };
+}
+
+/// Colors of tajweed rulings, after the color-coded tajweed mushaf: reds for
+/// madd by length, green for nasalization, grey for merging, blue for
+/// qalqalah.
+Color tajweedColor(TajweedRule rule, Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  return switch (rule) {
+    TajweedRule.maddLazim => dark ? const Color(0xFFFF6B6B) : const Color(0xFFB91C1C),
+    TajweedRule.maddMuttasil => dark ? const Color(0xFFFF8A80) : const Color(0xFFDC2626),
+    TajweedRule.maddMunfasil => dark ? const Color(0xFFFFAB91) : const Color(0xFFEA580C),
+    TajweedRule.madd => dark ? const Color(0xFFFFCC80) : const Color(0xFFD97706),
+    TajweedRule.ghunnah ||
+    TajweedRule.ikhfa ||
+    TajweedRule.ikhfaShafawi ||
+    TajweedRule.iqlab =>
+      dark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
+    TajweedRule.idgham || TajweedRule.idghamShafawi => dark ? const Color(0xFFB0B7C3) : const Color(0xFF6B7280),
+    TajweedRule.qalqalah => dark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+  };
 }
 
 /// Arabic-Indic digits for ayah numbers.

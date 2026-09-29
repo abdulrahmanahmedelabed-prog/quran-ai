@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../core/arabic.dart';
+import '../core/tajweed.dart';
 
 class Surah {
   const Surah({
@@ -34,6 +35,8 @@ class QuranWord {
     required this.indexInAyah,
     required this.text,
     required this.forms,
+    this.tajweed = const [],
+    this.endsAyah = false,
   });
 
   final int surah;
@@ -45,6 +48,12 @@ class QuranWord {
 
   /// Accepted normalized spellings; the first is the plain normalization.
   final List<String> forms;
+
+  /// Tajweed rules applying to parts of [text].
+  final List<TajweedMark> tajweed;
+
+  /// Whether this is the last word of its ayah.
+  final bool endsAyah;
 
   String get normalized => forms.first;
 }
@@ -84,6 +93,15 @@ List<String> _formsFor(String text, {required bool mayBeMuqattaat}) {
   return forms;
 }
 
+/// The Tanzil text writes open tanween (tanween followed by ikhfa or idgham)
+/// with legacy code points that Quran fonts render as other marks or not at
+/// all. Swapping in the standard code points is one-to-one, so text offsets
+/// are unchanged.
+String standardizeMarks(String text) => text
+    .replaceAll('\u0657', '\u08F0') // open fathatan
+    .replaceAll('\u065E', '\u08F1') // open dammatan
+    .replaceAll('\u0656', '\u08F2'); // open kasratan
+
 class Quran {
   Quran(this.surahs);
 
@@ -100,7 +118,7 @@ class Quran {
           name: s['name'] as String,
           englishName: s['en'] as String,
           revelation: s['type'] as String,
-          ayahs: List<String>.from(s['ayahs'] as List),
+          ayahs: [for (final a in s['ayahs'] as List) standardizeMarks(a as String)],
         ),
     ];
     return Quran(surahs);
@@ -115,6 +133,7 @@ class Quran {
     final tokens = ayahText(surah, ayah).split(' ');
     // Disjoined letters open ayah 1 of their surahs, plus 42:2 (عٓسٓقٓ).
     final muqattaatAyah = ayah == 1 || (surah == 42 && ayah == 2);
+    final tajweed = annotateAyah(tokens);
     return [
       for (var i = 0; i < tokens.length; i++)
         QuranWord(
@@ -123,6 +142,8 @@ class Quran {
           indexInAyah: i,
           text: tokens[i],
           forms: _formsFor(tokens[i], mayBeMuqattaat: muqattaatAyah && i == 0),
+          tajweed: tajweed[i],
+          endsAyah: i == tokens.length - 1,
         ),
     ];
   }

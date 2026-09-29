@@ -7,14 +7,16 @@ library;
 
 import 'dart:math' as math;
 
-const _daggerAlef = 'ٰ';
-const _alefMaksura = 'ى';
+const _daggerAlef = '\u0670';
+const _alefMaksura = '\u0649';
 
 final RegExp _tashkeelAndMarks = RegExp(
   // Harakat, shadda, sukun, maddah, hamza above/below, etc.
   '[ؐ-ًؚ-ٟ'
   // Quranic annotation signs: small letters, pause marks, rub el hizb, sajda.
   'ۖ-ۭ'
+  // Extended Arabic marks (open tanween and other Quranic marks).
+  '࣓-ࣿ'
   // Tatweel.
   'ـ]',
 );

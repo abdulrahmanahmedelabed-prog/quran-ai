@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:whisper_ggml/whisper_ggml.dart';
 
+import '../core/recitation_review.dart';
 import 'engine.dart';
 
 /// Locates (and downloads on first use) the ggml Whisper model file.
@@ -85,6 +86,10 @@ class OnDeviceEngine implements RecognitionEngine {
 
   @override
   Stream<double> get levels => _mic.levels;
+
+  /// The live whisper.cpp session reports text only.
+  @override
+  List<TimedWord> get timedWords => const [];
 
   @override
   Future<void> start() async {

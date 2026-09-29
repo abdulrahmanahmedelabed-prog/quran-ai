@@ -9,7 +9,9 @@ WS   /v1/stream      live recognition of a PCM16 16 kHz mono stream
 Streaming protocol: the client sends binary audio messages and, when done, a
 text message ``{"type": "stop"}``. The server sends JSON text messages:
 ``{"type": "ready"}`` once, then ``partial``/``final`` events per segment
-(see ``streaming.py``), and ``{"type": "done"}`` before closing.
+(see ``streaming.py``), and ``{"type": "done"}`` before closing. ``final``
+events carry ``words`` (text with start/end seconds) when the model supports
+word timestamps; the app uses them to check madd lengths.
 """
 
 from __future__ import annotations
@@ -97,7 +99,12 @@ def create_app(settings: Settings | None = None, transcriber: Transcriber | None
             await ws.close(code=4401, reason="invalid API key")
             return
         await ws.accept()
-        session = StreamSession(state["transcriber"].transcribe, settings.stream)
+        transcriber = state["transcriber"]
+        session = StreamSession(
+            transcriber.transcribe,
+            settings.stream,
+            transcribe_words=getattr(transcriber, "transcribe_words", None),
+        )
         audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
 
         async def receive() -> None:

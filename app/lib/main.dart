@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_scope.dart';
+import 'billing/subscription.dart';
 import 'data/progress.dart';
 import 'data/quran.dart';
 import 'data/settings.dart';
@@ -16,8 +20,16 @@ Future<void> main() async {
     AppSettings.load(),
     ProgressStore.load(),
   ).wait;
-  final services = AppServices(quran: Quran.fromJson(json), settings: settings, progress: progress);
+  final subscription = SubscriptionService(await SharedPreferences.getInstance());
+  final services = AppServices(
+    quran: Quran.fromJson(json),
+    settings: settings,
+    progress: progress,
+    subscription: subscription,
+  );
   runApp(QuranAiApp(services: services));
+  // Prices load in the background; the paywall shows them once ready.
+  unawaited(subscription.init());
 }
 
 class QuranAiApp extends StatelessWidget {

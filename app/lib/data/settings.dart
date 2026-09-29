@@ -80,6 +80,22 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Color mistakes on the words themselves while reciting. Off by default:
+  /// mistakes go quietly into the ayah's margin instead, so the reciter isn't
+  /// interrupted.
+  bool get mistakesInText => _prefs.getBool('mistakesInText') ?? false;
+  set mistakesInText(bool v) {
+    _prefs.setBool('mistakesInText', v);
+    notifyListeners();
+  }
+
+  /// Color tajweed rulings in the mushaf (Plus).
+  bool get tajweedColors => _prefs.getBool('tajweedColors') ?? true;
+  set tajweedColors(bool v) {
+    _prefs.setBool('tajweedColors', v);
+    notifyListeners();
+  }
+
   void _set(String key, String value) {
     _prefs.setString(key, value);
     notifyListeners();
