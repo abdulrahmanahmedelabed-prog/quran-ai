@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,7 +23,8 @@ Future<void> main() async {
   ).wait;
   final subscription = SubscriptionService(await SharedPreferences.getInstance());
   final services = AppServices(
-    quran: Quran.fromJson(json),
+    // Parsed off the UI thread: 1.3 MB of JSON is slow on older phones.
+    quran: await _parseQuran(json),
     settings: settings,
     progress: progress,
     subscription: subscription,
@@ -31,6 +33,9 @@ Future<void> main() async {
   // Prices load in the background; the paywall shows them once ready.
   unawaited(subscription.init());
 }
+
+// A separate function so the isolate closure captures only [json].
+Future<Quran> _parseQuran(String json) => Isolate.run(() => Quran.fromJson(json));
 
 class QuranAiApp extends StatelessWidget {
   const QuranAiApp({super.key, required this.services});

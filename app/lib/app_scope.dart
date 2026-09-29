@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import 'package:flutter/widgets.dart';
 
 import 'asr/engine.dart';
@@ -27,12 +29,17 @@ class AppServices {
   /// Overrides engine creation (used by tests).
   final RecognitionEngine Function()? engineFactory;
 
-  AyahSearchIndex? _searchIndex;
+  Future<AyahSearchIndex>? _searchIndex;
 
-  /// Built on first use (~77k words), then cached.
-  AyahSearchIndex get searchIndex => _searchIndex ??= AyahSearchIndex([
-        for (final w in quran.allWords()) IndexedWord(w.surah, w.ayah, w.indexInAyah, w.forms),
-      ]);
+  /// Built on first use (~77k words) in a background isolate so the UI stays
+  /// responsive on slower phones, then cached.
+  Future<AyahSearchIndex> get searchIndex => _searchIndex ??= _buildSearchIndex(quran);
+
+  // Static so the isolate closure captures only [quran], not these services
+  // (which hold unsendable objects).
+  static Future<AyahSearchIndex> _buildSearchIndex(Quran quran) => Isolate.run(() => AyahSearchIndex([
+        for (final w in quran.allWords(withTajweed: false)) IndexedWord(w.surah, w.ayah, w.indexInAyah, w.forms),
+      ]));
 
   ModelManager get modelManager => ModelManager(modelUrl: settings.modelUrl);
 

@@ -1,0 +1,11 @@
+# Stands in for ffmpeg_kit_flutter_new_min (via dependency_overrides in the
+# app's pubspec). whisper_ggml depends on FFmpeg only to convert non-WAV
+# files; the app streams raw PCM, so the ~37 MB native FFmpeg library is
+# never used. This stub has the same Dart API and no native code.
+name: ffmpeg_kit_flutter_new_min
+description: API-compatible stub of ffmpeg_kit_flutter_new_min without FFmpeg.
+version: 2.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"

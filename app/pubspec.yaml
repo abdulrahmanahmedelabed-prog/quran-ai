@@ -22,6 +22,12 @@ dependencies:
   in_app_purchase: ^3.3.1
   just_audio_windows: ^0.2.3
 
+# whisper_ggml pulls in FFmpeg (~37 MB of native libraries) only to convert
+# audio files; the app streams PCM, so it is replaced with a stub.
+dependency_overrides:
+  ffmpeg_kit_flutter_new_min:
+    path: third_party/ffmpeg_kit_stub
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

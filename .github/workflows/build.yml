@@ -41,14 +41,28 @@ jobs:
           SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKM" --licenses > /dev/null
           "$SDKM" "ndk;29.0.13113456" > /dev/null
-      # Signed with the debug key so it installs directly; set up a release
+      # One APK per CPU type instead of one holding all of them: arm64 fits
+      # most phones since ~2017, armv7 the older 32-bit ones. The AAB is for
+      # Google Play, which delivers only what each phone needs.
+      # Signed with the debug key so they install directly; set up a release
       # keystore before publishing to Google Play.
-      - run: flutter build apk --release
-      - run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/quran-ai.apk
+      - run: flutter build apk --release --split-per-abi
+      - run: flutter build appbundle --release
+      - name: Name and measure
+        run: |
+          cd build/app/outputs
+          mkdir -p dist
+          mv flutter-apk/app-arm64-v8a-release.apk dist/quran-ai-arm64.apk
+          mv flutter-apk/app-armeabi-v7a-release.apk dist/quran-ai-armv7-old-phones.apk
+          mv flutter-apk/app-x86_64-release.apk dist/quran-ai-x86_64.apk
+          mv bundle/release/app-release.aab dist/quran-ai-google-play.aab
+          ls -l dist
+          # The largest files inside the arm64 APK, to keep an eye on size.
+          unzip -lv dist/quran-ai-arm64.apk | sort -k3 -n -r | head -n 12
       - uses: actions/upload-artifact@v4
         with:
           name: quran-ai-android
-          path: app/build/app/outputs/flutter-apk/quran-ai.apk
+          path: app/build/app/outputs/dist/
           retention-days: 30
 
   ios:
@@ -96,7 +110,13 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build windows --release
+      - name: Build
+        run: |
+          # Native plugins print thousands of warnings; keep errors visible.
+          flutter build windows --release 2>&1 | tee build.log || {
+            grep -nE "error [A-Z]*[0-9]+|: error|Error:|FAILED" build.log | head -n 60
+            exit 1
+          }
       - name: Package
         shell: pwsh
         run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath quran-ai-windows.zip
@@ -106,12 +126,13 @@ jobs:
           path: app/quran-ai-windows.zip
           retention-days: 30
       - name: Screen tour on Windows
+        id: tour
         run: |
           flutter drive --driver=test_driver/integration_test.dart \
             --target=integration_test/emulator_tour_test.dart -d windows \
             --dart-define=SCREENSHOT_DIR="$(cygpath -m "$PWD/screenshots")" 2>&1 | tee drive.log
       - name: Publish screenshots to the ci-screenshots-windows branch
-        if: always()
+        if: always() && hashFiles('app/screenshots/*.png') != ''
         working-directory: app/screenshots
         run: |
           git init -q
@@ -121,7 +142,7 @@ jobs:
             commit -qm "Windows screenshots for ${GITHUB_SHA}"
           git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" ci-screenshots-windows
       - name: Check the tour passed
-        if: always()
+        if: always() && steps.tour.outcome != 'skipped'
         run: |
           tail -n 40 drive.log
           grep -q "All tests passed" drive.log

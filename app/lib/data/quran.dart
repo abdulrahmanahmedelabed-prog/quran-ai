@@ -129,11 +129,13 @@ class Quran {
   String ayahText(int surah, int ayah) => surahs[surah - 1].ayahs[ayah - 1];
 
   /// Words of one ayah.
-  List<QuranWord> ayahWords(int surah, int ayah) {
+  /// [withTajweed] can be turned off where rulings aren't needed (the search
+  /// index), which saves work on older phones.
+  List<QuranWord> ayahWords(int surah, int ayah, {bool withTajweed = true}) {
     final tokens = ayahText(surah, ayah).split(' ');
     // Disjoined letters open ayah 1 of their surahs, plus 42:2 (عٓسٓقٓ).
     final muqattaatAyah = ayah == 1 || (surah == 42 && ayah == 2);
-    final tajweed = annotateAyah(tokens);
+    final tajweed = withTajweed ? annotateAyah(tokens) : null;
     return [
       for (var i = 0; i < tokens.length; i++)
         QuranWord(
@@ -142,7 +144,7 @@ class Quran {
           indexInAyah: i,
           text: tokens[i],
           forms: _formsFor(tokens[i], mayBeMuqattaat: muqattaatAyah && i == 0),
-          tajweed: tajweed[i],
+          tajweed: tajweed?[i] ?? const [],
           endsAyah: i == tokens.length - 1,
         ),
     ];
@@ -157,10 +159,10 @@ class Quran {
   }
 
   /// Every word of the Quran in order (used to build the search index).
-  Iterable<QuranWord> allWords() sync* {
+  Iterable<QuranWord> allWords({bool withTajweed = true}) sync* {
     for (final s in surahs) {
       for (var a = 1; a <= s.ayahCount; a++) {
-        yield* ayahWords(s.number, a);
+        yield* ayahWords(s.number, a, withTajweed: withTajweed);
       }
     }
   }

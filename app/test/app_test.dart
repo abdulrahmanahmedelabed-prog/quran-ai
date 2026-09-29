@@ -170,6 +170,13 @@ void main() {
     c.dispose();
   });
 
+  test('the search index builds in a background isolate', () async {
+    final services = await makeServices();
+    final index = await services.searchIndex;
+    expect(index.search('قل هو الله احد الله الصمد').first.surah, 112);
+    expect(identical(await services.searchIndex, index), isTrue);
+  });
+
   test('a store purchase unlocks its tier', () async {
     SharedPreferences.setMockInitialValues({});
     final store = FakeStore();

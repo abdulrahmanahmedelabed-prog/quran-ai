@@ -26,9 +26,17 @@ class _VoiceSearchPageState extends State<VoiceSearchPage> {
   List<SearchHit> _hits = const [];
   Timer? _debounce;
 
-  void _search(String text) {
-    final hits = AppScope.of(context).searchIndex.search(text);
-    setState(() => _hits = hits);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Start building the index before the first search needs it.
+    AppScope.of(context).searchIndex;
+  }
+
+  Future<void> _search(String text) async {
+    final index = await AppScope.of(context).searchIndex;
+    if (!mounted) return;
+    setState(() => _hits = index.search(text));
   }
 
   Future<void> _toggle() async {

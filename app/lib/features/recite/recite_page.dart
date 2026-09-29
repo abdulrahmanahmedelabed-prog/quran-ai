@@ -62,16 +62,28 @@ class _RecitePageState extends State<RecitePage> {
     if (_c.isListening && _c.currentAyah != _scrolledTo) _scrollToAyah(_c.currentAyah);
   }
 
-  void _scrollToAyah(int ayah, {bool animate = true}) {
+  /// Brings [ayah] into view. Ayahs are built lazily, so one far away has no
+  /// context yet: jump to its estimated position first, then align it once
+  /// it has been built.
+  void _scrollToAyah(int ayah, {bool animate = true, int attempts = 3}) {
     _scrolledTo = ayah;
     final ctx = _ayahKeys[ayah]?.currentContext;
-    if (ctx == null) return;
-    Scrollable.ensureVisible(
-      ctx,
-      alignment: 0.25,
-      duration: animate ? const Duration(milliseconds: 350) : Duration.zero,
-      curve: Curves.easeOut,
-    );
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.25,
+        duration: animate ? const Duration(milliseconds: 350) : Duration.zero,
+        curve: Curves.easeOut,
+      );
+      return;
+    }
+    if (attempts == 0 || !_scroll.hasClients) return;
+    final position = _scroll.position;
+    final share = _c.firstWordOf(ayah) / _c.words.length;
+    position.jumpTo((position.maxScrollExtent * share).clamp(0, position.maxScrollExtent));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollToAyah(ayah, animate: false, attempts: attempts - 1);
+    });
   }
 
   @override
@@ -179,16 +191,14 @@ class _RecitePageState extends State<RecitePage> {
           body: Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
+                // Built lazily: long surahs (al-Baqarah has 6,000+ words)
+                // stay smooth on older phones.
+                child: ListView.builder(
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _SurahHeader(surah: widget.surah),
-                      for (var a = 1; a <= widget.surah.ayahCount; a++) _buildAyah(a, settings.fontSize),
-                    ],
-                  ),
+                  itemCount: widget.surah.ayahCount + 1,
+                  itemBuilder: (context, i) =>
+                      i == 0 ? _SurahHeader(surah: widget.surah) : _buildAyah(i, settings.fontSize),
                 ),
               ),
               _ControlBar(controller: _c, onMic: _toggleMic),
@@ -448,13 +458,16 @@ class _MicButton extends StatelessWidget {
     return Stack(
       alignment: Alignment.center,
       children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          width: 64 + (listening ? controller.level * 22 : 0),
-          height: 64 + (listening ? controller.level * 22 : 0),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: scheme.primary.withValues(alpha: listening ? 0.18 : 0),
+        ValueListenableBuilder<double>(
+          valueListenable: controller.level,
+          builder: (context, level, _) => AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            width: 64 + (listening ? level * 22 : 0),
+            height: 64 + (listening ? level * 22 : 0),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: scheme.primary.withValues(alpha: listening ? 0.18 : 0),
+            ),
           ),
         ),
         SizedBox(

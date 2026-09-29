@@ -79,7 +79,9 @@ class ReciteController extends ChangeNotifier {
 
   ReciteStatus status = ReciteStatus.idle;
   String? error;
-  double level = 0;
+  /// Microphone level in [0, 1]. Separate from [notifyListeners] so the mic
+  /// animation doesn't rebuild the whole page many times a second.
+  final ValueNotifier<double> level = ValueNotifier(0);
   String lastTranscript = '';
 
   /// Memorization mode: words not yet recited are hidden.
@@ -130,10 +132,7 @@ class ReciteController extends ChangeNotifier {
       _tracker.update(text);
       notifyListeners();
     });
-    _levelSub = engine.levels.listen((v) {
-      level = v;
-      notifyListeners();
-    });
+    _levelSub = engine.levels.listen((v) => level.value = v);
     try {
       await engine.start();
       status = ReciteStatus.listening;
@@ -168,7 +167,7 @@ class ReciteController extends ChangeNotifier {
       }
     }
     status = ReciteStatus.idle;
-    level = 0;
+    level.value = 0;
     final result = _saveSession();
     // The next session continues from here with a fresh transcript.
     _tracker.newTranscript();
@@ -280,6 +279,7 @@ class ReciteController extends ChangeNotifier {
   @override
   void dispose() {
     unawaited(_teardown());
+    level.dispose();
     super.dispose();
   }
 }
