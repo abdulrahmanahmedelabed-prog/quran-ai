@@ -12,6 +12,10 @@ on:
       ios:
         description: "Also build the iOS IPA (unsigned)"
         type: boolean
+        default: false
+      emulator:
+        description: "Run a screen tour on an Android emulator"
+        type: boolean
         default: true
 
 jobs:
@@ -72,4 +76,53 @@ jobs:
         with:
           name: quran-ai-ios-unsigned
           path: app/quran-ai-unsigned.ipa
+          retention-days: 30
+
+  # Runs integration_test/emulator_tour_test.dart on an Android emulator and
+  # keeps the screenshots (also printed to the log as base64 JPEG).
+  android-emulator:
+    if: github.event_name == 'workflow_dispatch' && inputs.emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: app
+      - name: Install Android NDK
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null
+          "$SDKM" "ndk;29.0.13113456" > /dev/null
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7
+          disable-animations: true
+          working-directory: app
+          script: flutter drive --driver=test_driver/integration_test.dart --target=integration_test/emulator_tour_test.dart -d emulator-5554
+      - name: Print screenshots
+        if: always()
+        run: |
+          pip install -q pillow
+          python3 tools/print_screenshots.py app/screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-screenshots
+          path: app/screenshots/
           retention-days: 30

@@ -134,9 +134,13 @@ class _Metric extends StatelessWidget {
   final int value;
   final Color color;
 
+  // Metrics share the row equally so four of them fit narrow screens and
+  // large system fonts.
   @override
-  Widget build(BuildContext context) => Column(children: [
-        Text(arabicNumber(value), style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: color)),
-        Text(label, style: const TextStyle(fontSize: 13)),
-      ]);
+  Widget build(BuildContext context) => Expanded(
+        child: Column(children: [
+          Text(arabicNumber(value), style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: color)),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
+        ]),
+      );
 }
