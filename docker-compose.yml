@@ -1,0 +1,11 @@
+# Recognition server for the app: `docker compose up -d`, then put
+# http://<this machine's IP>:8000 in the app's settings.
+services:
+  asr:
+    build: ./server
+    ports:
+      - "8000:8000"
+    environment:
+      # Optional: require this key from the app (Settings → مفتاح الوصول).
+      QURAN_ASR_API_KEY: ${QURAN_ASR_API_KEY:-}
+    restart: unless-stopped

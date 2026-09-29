@@ -31,6 +31,12 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      # whisper_ggml builds whisper.cpp with this NDK, which the runner lacks.
+      - name: Install Android NDK
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null
+          "$SDKM" "ndk;29.0.13113456" > /dev/null
       # Signed with the debug key so it installs directly; set up a release
       # keystore before publishing to Google Play.
       - run: flutter build apk --release
