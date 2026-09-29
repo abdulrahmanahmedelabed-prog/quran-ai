@@ -1,6 +1,6 @@
 name: Build app
 
-# Android: an installable APK on every push. iOS: an unsigned IPA on demand
+# Android APK and Windows zip on every push. iOS: an unsigned IPA on demand
 # (Actions → Build app → Run workflow), since macOS runners are costly.
 on:
   push:
@@ -77,6 +77,54 @@ jobs:
           name: quran-ai-ios-unsigned
           path: app/quran-ai-unsigned.ipa
           retention-days: 30
+
+  # Windows desktop app, zipped. The tour also runs on the Windows runner as a
+  # smoke test; its screenshots go to the ci-screenshots-windows branch.
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write  # publishes screenshots to ci-screenshots-windows
+    defaults:
+      run:
+        working-directory: app
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - name: Package
+        shell: pwsh
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath quran-ai-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quran-ai-windows
+          path: app/quran-ai-windows.zip
+          retention-days: 30
+      - name: Screen tour on Windows
+        run: |
+          flutter drive --driver=test_driver/integration_test.dart \
+            --target=integration_test/emulator_tour_test.dart -d windows \
+            --dart-define=SCREENSHOT_DIR="$(cygpath -m "$PWD/screenshots")" 2>&1 | tee drive.log
+      - name: Publish screenshots to the ci-screenshots-windows branch
+        if: always()
+        working-directory: app/screenshots
+        run: |
+          git init -q
+          git checkout -q -b ci-screenshots-windows
+          git add .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -qm "Windows screenshots for ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" ci-screenshots-windows
+      - name: Check the tour passed
+        if: always()
+        run: |
+          tail -n 40 drive.log
+          grep -q "All tests passed" drive.log
 
   # Runs integration_test/emulator_tour_test.dart on an Android emulator and
   # keeps the screenshots (also printed to the log as base64 JPEG).

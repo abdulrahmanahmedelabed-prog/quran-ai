@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -80,8 +81,14 @@ class SubscriptionService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Whether this platform has an app store to buy from (not Windows or
+  /// Linux, where the plugin has no implementation).
+  bool get platformHasStore =>
+      _storeOverride != null || Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+
   /// Connects to the store and loads prices. Call once at startup.
   Future<void> init() async {
+    if (!platformHasStore) return;
     try {
       storeAvailable = await _store.isAvailable();
       if (!storeAvailable) return;

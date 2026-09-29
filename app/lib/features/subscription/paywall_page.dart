@@ -132,7 +132,7 @@ class _TierCard extends StatelessWidget {
               if (!sub.storeAvailable)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text('المتجر غير متاح حاليًا.',
+                  child: Text(sub.platformHasStore ? 'المتجر غير متاح حاليًا.' : 'الاشتراك متاح من تطبيق الجوال.',
                       textAlign: TextAlign.center, style: TextStyle(color: scheme.outline, fontSize: 13)),
                 ),
             ],
