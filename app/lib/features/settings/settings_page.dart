@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../app_scope.dart';
 import '../../asr/engine.dart';
+import '../../asr/on_device_engine.dart';
 import '../../data/settings.dart';
+import '../../ui/theme.dart';
 import '../subscription/paywall_page.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -40,12 +42,12 @@ class SettingsPage extends StatelessWidget {
                 RadioListTile(
                   value: EngineKind.server,
                   title: Text('عبر الخادم'),
-                  subtitle: Text('أدق، ويتطلب اتصالاً بالإنترنت'),
+                  subtitle: Text('يحتاج خادمًا خاصًا واتصالًا بالإنترنت'),
                 ),
                 RadioListTile(
                   value: EngineKind.onDevice,
                   title: Text('على الجهاز'),
-                  subtitle: Text('يعمل دون إنترنت ويحفظ خصوصيتك'),
+                  subtitle: Text('يعمل دون إنترنت بعد تنزيل النموذج مرة واحدة، ويحفظ خصوصيتك'),
                 ),
               ]),
             ),
@@ -217,15 +219,30 @@ class _ModelDownloadTile extends StatefulWidget {
 
 class _ModelDownloadTileState extends State<_ModelDownloadTile> {
   bool? _ready;
-  double? _progress;
-  bool _downloading = false;
   String? _error;
   String? _checkedUrl;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _check();
+  void initState() {
+    super.initState();
+    // A download started from the recitation screen shows here too, and the
+    // tile turns ready when it finishes.
+    ModelManager.progress.addListener(_onProgress);
+  }
+
+  @override
+  void dispose() {
+    ModelManager.progress.removeListener(_onProgress);
+    super.dispose();
+  }
+
+  void _onProgress() {
+    if (!mounted) return;
+    if (ModelManager.progress.value == null) {
+      _checkedUrl = null; // finished: look at the disk again
+      _check();
+    }
+    setState(() {});
   }
 
   Future<void> _check() async {
@@ -237,32 +254,37 @@ class _ModelDownloadTileState extends State<_ModelDownloadTile> {
   }
 
   Future<void> _download() async {
-    setState(() {
-      _downloading = true;
-      _error = null;
-      _progress = null;
-    });
+    setState(() => _error = null);
+    final manager = AppScope.of(context).modelManager;
     try {
-      await AppScope.of(context).modelManager.ensure(onProgress: (p) {
-        if (mounted) setState(() => _progress = p);
-      });
+      await manager.ensure();
       _ready = true;
     } catch (e) {
       _error = e is RecognitionException ? e.message : 'فشل التنزيل: $e';
     }
-    if (mounted) setState(() => _downloading = false);
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     _check();
+    final manager = AppScope.of(context).modelManager;
+    final downloading = manager.isDownloading;
+    final progress = ModelManager.progress.value;
+    final ready = _ready == true && !downloading;
     return ListTile(
-      leading: Icon(_ready == true ? Icons.check_circle : Icons.download_outlined),
-      title: Text(_ready == true ? 'النموذج جاهز على الجهاز' : 'تنزيل النموذج'),
-      subtitle: _downloading
-          ? LinearProgressIndicator(value: _progress)
-          : Text(_error ?? 'يُنزَّل مرة واحدة ثم يعمل دون إنترنت'),
-      onTap: _downloading || _ready == true ? null : _download,
+      leading: Icon(ready ? Icons.check_circle : Icons.download_outlined,
+          color: ready ? Theme.of(context).colorScheme.primary : null),
+      title: Text(ready
+          ? 'النموذج جاهز على الجهاز'
+          : downloading
+              ? 'جارٍ تنزيل النموذج…${progress != null && progress >= 0 ? ' ${arabicNumber((progress * 100).round())}٪' : ''}'
+              : 'تنزيل النموذج'),
+      subtitle: downloading
+          ? LinearProgressIndicator(value: progress != null && progress >= 0 ? progress : null)
+          : Text(_error ?? (ready ? 'محفوظ على جهازك، يعمل دون إنترنت' : 'يُنزَّل مرة واحدة ثم يعمل دون إنترنت')),
+      // Nothing to do once it is on the device or while it is downloading.
+      onTap: ready || downloading || _ready == null ? null : _download,
     );
   }
 }

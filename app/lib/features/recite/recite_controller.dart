@@ -157,9 +157,12 @@ class ReciteController extends ChangeNotifier {
     _levelSub = engine.levels.listen((v) => level.value = v);
     try {
       await engine.start();
+      if (_disposed) return;
       modelProgress = null;
       status = ReciteStatus.listening;
     } catch (e) {
+      // The page was closed while starting; the engine is already disposed.
+      if (_disposed) return;
       modelProgress = null;
       error = e is RecognitionException ? e.message : 'حدث خطأ: $e';
       await _teardown();
@@ -300,8 +303,11 @@ class ReciteController extends ChangeNotifier {
     _engine = null;
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     unawaited(_teardown());
     level.dispose();
     super.dispose();

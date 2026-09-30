@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../app_scope.dart';
+import '../../data/ayah_audio.dart';
 import '../../data/quran.dart';
 import '../../ui/theme.dart';
 import 'ayah_margin_sheet.dart';
@@ -123,31 +124,37 @@ class _RecitePageState extends State<RecitePage> {
   Future<void> _playFromAyah(int ayah) async {
     final reciter = AppScope.of(context).settings.reciterId;
     await _c.stop();
-    String pad(int n) => n.toString().padLeft(3, '0');
-    final sources = [
-      for (var a = ayah; a <= widget.surah.ayahCount; a++)
-        AudioSource.uri(Uri.parse('https://everyayah.com/data/$reciter/${pad(widget.surah.number)}${pad(a)}.mp3')),
+    final audio = [
+      for (var a = ayah; a <= widget.surah.ayahCount; a++) await AyahAudio.of(reciter, widget.surah.number, a),
     ];
+    if (!mounted) return;
     _playFrom = ayah;
     _indexSub?.cancel();
     _indexSub = _player.currentIndexStream.listen((i) {
-      if (i == null) return;
+      if (i == null || !mounted) return;
       setState(() => _playingAyah = _playFrom + i);
       _scrollToAyah(_playFrom + i);
     });
     try {
-      await _player.setAudioSources(sources);
+      await _player.setAudioSources([for (final a in audio) a.source]);
+      if (!mounted) return;
       setState(() => _playingAyah = ayah);
       await _player.play();
       // play() completes when playback stops or the playlist ends.
       if (mounted && _player.processingState == ProcessingState.completed) {
         setState(() => _playingAyah = null);
       }
+    } on PlayerInterruptedException {
+      // Another ayah was chosen, or listening was stopped, while loading.
     } catch (_) {
       if (mounted) {
         setState(() => _playingAyah = null);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('تعذر تشغيل التلاوة. تحقق من الاتصال بالإنترنت.')));
+        // A saved ayah plays without the internet, so only blame the
+        // connection when the ayah had to be downloaded.
+        final message = audio.first.isSaved
+            ? 'تعذّر تشغيل صوت القارئ. حاول مرة أخرى.'
+            : 'تعذّر تنزيل صوت القارئ. تحقق من الإنترنت ثم حاول مرة أخرى.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }

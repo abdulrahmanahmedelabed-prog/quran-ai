@@ -47,7 +47,8 @@ class AppSettings extends ChangeNotifier {
   set engine(EngineKind v) => _set('engine', v.name);
 
   /// Base URL of the recognition server, e.g. `https://asr.example.com`.
-  String get serverUrl => _prefs.getString('serverUrl') ?? 'http://10.0.2.2:8000';
+  /// Empty until the user sets up a server.
+  String get serverUrl => _prefs.getString('serverUrl') ?? '';
   set serverUrl(String v) => _set('serverUrl', v.trim());
 
   String get apiKey => _prefs.getString('apiKey') ?? '';

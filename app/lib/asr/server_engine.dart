@@ -55,6 +55,9 @@ class ServerEngine implements RecognitionEngine {
 
   @override
   Future<void> start() async {
+    if (baseUrl.trim().isEmpty) {
+      throw const RecognitionException('لم يُضبط عنوان خادم التعرّف. اختر «على الجهاز» من الإعدادات.');
+    }
     await _mic.ensurePermission();
     final ready = Completer<void>();
     try {
@@ -99,7 +102,11 @@ class ServerEngine implements RecognitionEngine {
       rethrow;
     } catch (_) {
       await _channel?.sink.close();
-      throw RecognitionException('تعذر الاتصال بخادم التعرف على\n$baseUrl');
+      throw RecognitionException('تعذّر الاتصال بخادم التعرّف ($baseUrl).\nتأكد من العنوان في الإعدادات، أو اختر «على الجهاز».');
+    }
+    if (_disposed) {
+      await _channel?.sink.close();
+      throw const RecognitionException('أُلغي بدء التسميع.');
     }
     final audio = await _mic.start();
     _audio = audio.listen(_channel!.sink.add);
@@ -119,8 +126,11 @@ class ServerEngine implements RecognitionEngine {
     return transcript;
   }
 
+  bool _disposed = false;
+
   @override
   Future<void> dispose() async {
+    _disposed = true;
     await _audio?.cancel();
     await _channel?.sink.close();
     await _mic.dispose();

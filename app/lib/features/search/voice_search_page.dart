@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_scope.dart';
 import '../../asr/engine.dart';
+import '../../asr/on_device_engine.dart';
 import '../../core/ayah_search.dart';
 import '../../ui/theme.dart';
 import '../recite/recite_page.dart';
@@ -70,11 +71,14 @@ class _VoiceSearchPageState extends State<VoiceSearchPage> {
     });
     try {
       await engine.start();
+      if (!mounted) return;
       setState(() {
         _listening = true;
         _busy = false;
       });
     } catch (e) {
+      // Closed while starting: dispose() already released the engine.
+      if (!mounted) return;
       await _sub?.cancel();
       await engine.dispose();
       _engine = null;
@@ -125,6 +129,16 @@ class _VoiceSearchPageState extends State<VoiceSearchPage> {
             ),
           ),
           const SizedBox(height: 20),
+          if (_busy && !_listening)
+            ValueListenableBuilder<double?>(
+              valueListenable: ModelManager.progress,
+              builder: (context, p, _) => p == null
+                  ? const SizedBox.shrink()
+                  : Text(
+                      'جارٍ تنزيل نموذج التعرّف (مرة واحدة فقط)…${p >= 0 ? ' ${arabicNumber((p * 100).round())}٪' : ''}',
+                      textAlign: TextAlign.center,
+                    ),
+            ),
           if (_error != null) Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: scheme.error)),
           if (_transcript.isNotEmpty)
             Text('«$_transcript»', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
