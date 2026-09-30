@@ -40,7 +40,7 @@ def check_heard(path: str) -> None:
     # Compare skeletons: no marks and no alefs, so Uthmani and plain
     # spellings (ٱلرَّحْمَٰنِ, الرحمن) match.
     plain = re.sub(r"[ً-ٰٟۖ-ۭـاأإآٱ]", "", text)
-    missing = [w for w in ("لرحمن", "لرحيم", "لحمد", "لعلمين") if w not in plain]
+    missing = [w for w in ("لحمد", "لله", "لعلمين", "لدين") if w not in plain]
     if missing:
         sys.exit(f"transcript lacks {missing}: {text!r}")
     print("recognized al-Fatiha")

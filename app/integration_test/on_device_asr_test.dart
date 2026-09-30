@@ -43,7 +43,7 @@ void main() {
     // ignore: avoid_print
     print('ASR final after ${clock.elapsed}: $text');
     final heard = skeleton(normalizeArabic(text));
-    for (final word in ['الحمد', 'الرحيم']) {
+    for (final word in ['الحمد', 'العالمين']) {
       expect(heard, contains(skeleton(normalizeArabic(word))));
     }
   }, timeout: const Timeout(Duration(minutes: 20)));
