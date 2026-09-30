@@ -93,6 +93,14 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Show surahs on Madinah Mushaf pages (15 lines) rather than as
+  /// continuous text.
+  bool get mushafPages => _prefs.getBool('mushafPages') ?? true;
+  set mushafPages(bool v) {
+    _prefs.setBool('mushafPages', v);
+    notifyListeners();
+  }
+
   /// Color tajweed rulings in the mushaf (Plus).
   bool get tajweedColors => _prefs.getBool('tajweedColors') ?? true;
   set tajweedColors(bool v) {

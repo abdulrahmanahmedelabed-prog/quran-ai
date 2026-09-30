@@ -10,10 +10,12 @@ import 'package:quran_ai/app_scope.dart';
 import 'package:quran_ai/asr/engine.dart';
 import 'package:quran_ai/billing/subscription.dart';
 import 'package:quran_ai/core/recitation_review.dart';
+import 'package:quran_ai/data/mushaf_layout.dart';
 import 'package:quran_ai/data/progress.dart';
 import 'package:quran_ai/data/quran.dart';
 import 'package:quran_ai/data/settings.dart';
 import 'package:quran_ai/features/recite/ayah_margin_sheet.dart';
+import 'package:quran_ai/features/recite/mushaf_view.dart';
 import 'package:quran_ai/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -68,6 +70,7 @@ Future<(AppServices, ScriptedEngine)> tourServices() async {
     settings: AppSettings(prefs),
     progress: ProgressStore(prefs),
     subscription: SubscriptionService(prefs),
+    mushaf: MushafLayout.fromJson(await rootBundle.loadString('assets/quran/mushaf_madani.json')),
     engineFactory: () => engine,
   );
   return (services, engine);
@@ -108,8 +111,12 @@ Future<void> runTour(
   await shot('04_margin');
 
   final marker = find.byType(MarginMarker).first;
-  await tester.ensureVisible(marker);
-  await settle();
+  // The continuous view may need scrolling; mushaf pages show the marker on
+  // the current page already.
+  if (find.byType(MushafView).evaluate().isEmpty) {
+    await tester.ensureVisible(marker);
+    await settle();
+  }
   await tester.tap(marker);
   await settle();
   expect(find.byType(AyahMarginSheet), findsOneWidget);

@@ -41,6 +41,7 @@ flutter:
 
   assets:
     - assets/quran/quran_uthmani.json
+    - assets/quran/mushaf_madani.json
 
   fonts:
     - family: AmiriQuran

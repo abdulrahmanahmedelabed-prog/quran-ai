@@ -102,7 +102,22 @@ class ReciteController extends ChangeNotifier {
   bool get isListening => status == ReciteStatus.listening;
   int get position => _tracker.position;
 
-  int firstWordOf(int ayah) => words.indexWhere((w) => w.ayah == ayah);
+  int firstWordOf(int ayah) => _ayahStarts[ayah - 1];
+
+  late final List<int> _ayahStarts = () {
+    final starts = List<int>.filled(surah.ayahCount, 0);
+    for (var i = words.length - 1; i >= 0; i--) {
+      starts[words[i].ayah - 1] = i;
+    }
+    return starts;
+  }();
+
+  /// Index of word [w] (0-based within the ayah) of [ayah], or -1.
+  int wordIndex(int ayah, int w) {
+    if (ayah < 1 || ayah > surah.ayahCount || w < 0) return -1;
+    final i = _ayahStarts[ayah - 1] + w;
+    return i < words.length && words[i].ayah == ayah ? i : -1;
+  }
 
   /// Word indices of [ayah].
   Iterable<int> wordsOfAyah(int ayah) sync* {

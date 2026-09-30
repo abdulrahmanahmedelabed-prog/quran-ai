@@ -7,6 +7,7 @@ import 'asr/on_device_engine.dart';
 import 'asr/server_engine.dart';
 import 'billing/subscription.dart';
 import 'core/ayah_search.dart';
+import 'data/mushaf_layout.dart';
 import 'data/progress.dart';
 import 'data/quran.dart';
 import 'data/settings.dart';
@@ -18,6 +19,7 @@ class AppServices {
     required this.settings,
     required this.progress,
     required this.subscription,
+    this.mushaf,
     this.engineFactory,
   });
 
@@ -25,6 +27,9 @@ class AppServices {
   final AppSettings settings;
   final ProgressStore progress;
   final SubscriptionService subscription;
+
+  /// Madinah Mushaf page layout, when bundled.
+  final MushafLayout? mushaf;
 
   /// Overrides engine creation (used by tests).
   final RecognitionEngine Function()? engineFactory;

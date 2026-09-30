@@ -85,7 +85,7 @@ def main() -> None:
     for s in ours["surahs"]:
         for a, text in enumerate(s["ayahs"], start=1):
             key = (s["n"], a)
-            n = len(text.split())
+            n = len(text.split(" "))  # Tanzil separates words with spaces only (2:72 has a thin space inside a word)
             theirs = [words[key][i] for i in sorted(words[key])]
             if not theirs:
                 raise SystemExit(f"no layout for {key}")

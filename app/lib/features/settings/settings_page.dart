@@ -87,6 +87,13 @@ class SettingsPage extends StatelessWidget {
                 onChanged: (v) => s.fontSize = v,
               ),
             ),
+            if (services.mushaf != null)
+              SwitchListTile(
+                title: const Text('صفحات مصحف المدينة'),
+                subtitle: const Text('١٥ سطرًا في الصفحة كالمصحف المطبوع، أو نص متصل عند إيقافه'),
+                value: s.mushafPages,
+                onChanged: (v) => s.mushafPages = v,
+              ),
             SwitchListTile(
               title: const Text('إظهار الملاحظات على الكلمات أثناء القراءة'),
               subtitle: const Text('عند إيقافه تبقى الملاحظات في الهامش فقط حتى لا تقاطعك'),

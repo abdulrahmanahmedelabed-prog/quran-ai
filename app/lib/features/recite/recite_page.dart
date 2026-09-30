@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../app_scope.dart';
-import '../../core/recitation_tracker.dart';
 import '../../data/quran.dart';
 import '../../ui/theme.dart';
 import 'ayah_margin_sheet.dart';
+import 'mushaf_view.dart';
 import 'recite_controller.dart';
 import 'session_summary.dart';
+import 'word_style.dart';
 
 class RecitePage extends StatefulWidget {
   const RecitePage({super.key, required this.surah, this.fromAyah = 1});
@@ -33,6 +34,13 @@ class _RecitePageState extends State<RecitePage> {
   int? _playingAyah;
   int _playFrom = 1;
   int? _scrolledTo;
+  final _mushafKey = GlobalKey<MushafViewState>();
+
+  /// Madinah Mushaf pages when available and chosen, else continuous text.
+  bool get _useMushaf {
+    final services = AppScope.of(context);
+    return services.mushaf != null && services.settings.mushafPages;
+  }
 
   @override
   void initState() {
@@ -67,6 +75,10 @@ class _RecitePageState extends State<RecitePage> {
   /// it has been built.
   void _scrollToAyah(int ayah, {bool animate = true, int attempts = 3}) {
     _scrolledTo = ayah;
+    if (_useMushaf) {
+      _mushafKey.currentState?.showAyah(ayah);
+      return;
+    }
     final ctx = _ayahKeys[ayah]?.currentContext;
     if (ctx != null) {
       Scrollable.ensureVisible(
@@ -191,15 +203,24 @@ class _RecitePageState extends State<RecitePage> {
           body: Column(
             children: [
               Expanded(
-                // Built lazily: long surahs (al-Baqarah has 6,000+ words)
-                // stay smooth on older phones.
-                child: ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  itemCount: widget.surah.ayahCount + 1,
-                  itemBuilder: (context, i) =>
-                      i == 0 ? _SurahHeader(surah: widget.surah) : _buildAyah(i, settings.fontSize),
-                ),
+                child: _useMushaf
+                    ? MushafView(
+                        key: _mushafKey,
+                        controller: _c,
+                        layout: AppScope.of(context).mushaf!,
+                        initialAyah: widget.fromAyah,
+                        playingAyah: _playingAyah,
+                        onAyahTap: _showAyahSheet,
+                      )
+                    // Built lazily: long surahs (al-Baqarah has 6,000+
+                    // words) stay smooth on older phones.
+                    : ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                        itemCount: widget.surah.ayahCount + 1,
+                        itemBuilder: (context, i) =>
+                            i == 0 ? _SurahHeader(surah: widget.surah) : _buildAyah(i, settings.fontSize),
+                      ),
               ),
               _ControlBar(controller: _c, onMic: _toggleMic),
             ],
@@ -212,45 +233,12 @@ class _RecitePageState extends State<RecitePage> {
 
   Widget _buildAyah(int ayah, double fontSize) {
     final settings = AppScope.of(context).settings;
-    final colors = WordColors.of(context);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final position = _c.position;
+    final scheme = Theme.of(context).colorScheme;
+    final styler = WordStyler(context, _c, settings);
     final active = (_c.isListening && _c.currentAyah == ayah) || _playingAyah == ayah;
-    final tier = _c.tier;
-    final showTajweed = tier.detectsTajweed && settings.tajweedColors;
-    // Mistakes stay out of the text while reciting (they go to the margin),
-    // unless the reader asked to see them live. Afterwards they get a quiet
-    // dotted underline for review.
-    final markMistakes = tier.detectsMistakes && (settings.mistakesInText || !_c.isListening);
-    final spans = <InlineSpan>[];
-    for (final i in _wordsByAyah[ayah - 1]) {
-      final word = _c.words[i];
-      final state = _c.tracker.stateOf(i);
-      final hidden = _c.hidden && state.status == WordStatus.pending && !_c.peeked.contains(i);
-      final isNext = _c.isListening && i == position;
-      final recited = state.status != WordStatus.pending;
-      final mistake = state.status.isMistake;
-      final mistakeColor = colors.forStatus(state.status);
-
-      Color? base = recited ? colors.correct : scheme.onSurface;
-      if (state.tentative) base = base.withValues(alpha: 0.7);
-      if (mistake && markMistakes && settings.mistakesInText) base = mistakeColor;
-      final Color? background = hidden ? scheme.surfaceContainerHighest : (isNext ? colors.current : null);
-      final style = TextStyle(
-        color: hidden ? scheme.surfaceContainerHighest : base,
-        backgroundColor: background,
-        decoration: mistake && markMistakes ? TextDecoration.underline : null,
-        decorationStyle: TextDecorationStyle.dotted,
-        decorationColor: mistakeColor,
-      );
-      if (showTajweed && !hidden && word.tajweed.isNotEmpty) {
-        spans.add(TextSpan(style: style, children: _tajweedSpans(word, theme.brightness)));
-      } else {
-        spans.add(TextSpan(text: word.text, style: style));
-      }
-      spans.add(const TextSpan(text: ' '));
-    }
+    final spans = <InlineSpan>[
+      for (final i in _wordsByAyah[ayah - 1]) ...[styler.span(i), const TextSpan(text: ' ')],
+    ];
     spans.add(TextSpan(
       text: '﴿${arabicNumber(ayah)}﴾ ',
       style: TextStyle(color: scheme.primary, fontSize: fontSize * 0.8),
@@ -300,24 +288,6 @@ class _RecitePageState extends State<RecitePage> {
         ),
       ],
     );
-  }
-
-  /// A word split into spans colored by tajweed rule.
-  List<InlineSpan> _tajweedSpans(QuranWord word, Brightness brightness) {
-    final marks = [...word.tajweed]..sort((a, b) => a.start.compareTo(b.start));
-    final out = <InlineSpan>[];
-    var at = 0;
-    for (final m in marks) {
-      if (m.start < at) continue;
-      if (m.start > at) out.add(TextSpan(text: word.text.substring(at, m.start)));
-      out.add(TextSpan(
-        text: word.text.substring(m.start, m.end),
-        style: TextStyle(color: tajweedColor(m.rule, brightness)),
-      ));
-      at = m.end;
-    }
-    if (at < word.text.length) out.add(TextSpan(text: word.text.substring(at)));
-    return out;
   }
 }
 
