@@ -126,6 +126,7 @@ jobs:
       # emulator (which reaches the host at 10.0.2.2).
       - name: Serve test recitation
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
           mkdir -p asr && cd asr
           for a in 001 002 003 004; do
             curl -sSfL -o "a$a.mp3" "https://everyayah.com/data/Husary_128kbps/001$a.mp3"
