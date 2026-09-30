@@ -148,6 +148,9 @@ class ReciteController extends ChangeNotifier {
     final engine = _engine = services.createEngine(onModelProgress: (p) {
       modelProgress = p ?? -1;
       notifyListeners();
+    }, onModelLoading: () {
+      modelProgress = null;
+      notifyListeners();
     });
     _transcriptSub = engine.transcripts.listen((text) {
       lastTranscript = text;

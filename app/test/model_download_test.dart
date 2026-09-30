@@ -105,4 +105,15 @@ void main() {
     expect(a.last, 1.0);
     expect(b.last, 1.0);
   });
+
+  test('files of earlier model releases are removed once a model is ready', () async {
+    final old = File('${storage.path}/models/1234-ggml-quran-base.bin');
+    await old.create(recursive: true);
+    final keep = File('${storage.path}/models/other.bin');
+    await keep.create();
+    await ModelManager(modelUrl: 'http://127.0.0.1:${server.port}/v2/ggml-quran-base.bin', storage: () async => storage)
+        .ensure();
+    expect(await old.exists(), isFalse);
+    expect(await keep.exists(), isTrue);
+  });
 }

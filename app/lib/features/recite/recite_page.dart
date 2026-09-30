@@ -345,7 +345,7 @@ class _ControlBar extends StatelessWidget {
     final String status = switch (c.status) {
       ReciteStatus.idle => c.error ?? (stats.recited == 0 ? 'اضغط على الميكروفون وابدأ التلاوة' : 'اضغط للمتابعة'),
       ReciteStatus.starting => switch (c.modelProgress) {
-          null => 'جارٍ التحضير…',
+          null => 'جارٍ تجهيز التعرّف على التلاوة…',
           < 0 => 'جارٍ تنزيل نموذج التعرّف (مرة واحدة فقط)…',
           final p => 'جارٍ تنزيل نموذج التعرّف (مرة واحدة فقط)… ${arabicNumber((p * 100).round())}٪',
         },

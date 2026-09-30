@@ -24,7 +24,7 @@ class ModelManager {
   /// converted to ggml by the "Recognition model" workflow and published as a
   /// release of this repository.
   static const quranModelUrl =
-      'https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/model-v1/ggml-quran-base.bin';
+      'https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/model-v2/ggml-quran-base.bin';
 
   /// Used when the Quran model is not available on the server.
   static const fallbackModel = WhisperModel.base;
@@ -69,6 +69,24 @@ class ModelManager {
     }
   }
 
+  /// Deletes a model file that whisper.cpp could not load, so the next
+  /// attempt downloads it again.
+  Future<void> discard(String path) async {
+    try {
+      await File(path).delete();
+    } catch (_) {}
+  }
+
+  /// Removes files of earlier Quran model releases (model-v1 did not load),
+  /// keeping [current].
+  Future<void> _removeOldModels(String current) async {
+    try {
+      await for (final f in File(current).parent.list()) {
+        if (f is File && f.path != current && f.path.contains('ggml-quran-base.bin')) await f.delete();
+      }
+    } catch (_) {}
+  }
+
   /// Whether a download of this model is running (from any screen).
   bool get isDownloading => _running.containsKey(_candidates.join(' '));
 
@@ -76,7 +94,10 @@ class ModelManager {
   /// [onProgress] receives values in [0, 1] (null while the size is unknown).
   Future<String> ensure({void Function(double?)? onProgress}) async {
     final existing = await _existing();
-    if (existing != null) return existing;
+    if (existing != null) {
+      await _removeOldModels(existing);
+      return existing;
+    }
     void relay() {
       final p = progress.value;
       if (p != null) onProgress?.call(p < 0 ? null : p);
@@ -85,10 +106,12 @@ class ModelManager {
     progress.addListener(relay);
     try {
       final key = _candidates.join(' ');
-      return await (_running[key] ??= _downloadAny().whenComplete(() {
+      final path = await (_running[key] ??= _downloadAny().whenComplete(() {
         _running.remove(key);
         progress.value = null;
       }));
+      await _removeOldModels(path);
+      return path;
     } finally {
       progress.removeListener(relay);
     }
@@ -177,12 +200,19 @@ class _ModelUnavailable implements Exception {}
 /// Runs Whisper on the phone with whisper.cpp: no server needed, works
 /// offline after the model's one-time download.
 class OnDeviceEngine implements RecognitionEngine {
-  OnDeviceEngine({required this.models, this.onModelProgress});
+  OnDeviceEngine({required this.models, this.onModelProgress, this.onModelLoading});
 
   final ModelManager models;
 
   /// Model download progress, for the first run.
   final void Function(double?)? onModelProgress;
+
+  /// Called once the model is on the device and is being loaded into memory
+  /// (after a download this replaces the finished progress).
+  final VoidCallback? onModelLoading;
+
+  /// Loading takes seconds; anything near this means it is stuck.
+  static const loadTimeout = Duration(minutes: 2);
 
   final Microphone _mic = Microphone();
   final StreamController<String> _transcripts = StreamController.broadcast();
@@ -209,13 +239,25 @@ class OnDeviceEngine implements RecognitionEngine {
     await _mic.ensurePermission();
     final path = await models.ensure(onProgress: onModelProgress);
     _checkNotDisposed();
-    final session = _session = await startWhisperLiveSession(
-      modelPath: path,
-      lang: 'ar',
-      suppressNonSpeechTokens: true,
-      // Sessions are started and stopped often; avoid reloading each time.
-      keepModelLoaded: true,
-    );
+    onModelLoading?.call();
+    final WhisperLiveSession session;
+    try {
+      session = _session = await startWhisperLiveSession(
+        modelPath: path,
+        lang: 'ar',
+        suppressNonSpeechTokens: true,
+        // Sessions are started and stopped often; avoid reloading each time.
+        keepModelLoaded: true,
+      ).timeout(loadTimeout);
+    } on TimeoutException {
+      throw const RecognitionException('تعذّر تشغيل نموذج التعرّف على هذا الجهاز (استغرق وقتًا طويلًا). أعد المحاولة.');
+    } catch (e) {
+      if ('$e'.contains('failed to load model')) {
+        await models.discard(path);
+        throw const RecognitionException('ملف نموذج التعرّف لا يعمل فحُذف. اضغط الميكروفون ليُنزَّل من جديد.');
+      }
+      throw RecognitionException('تعذّر تشغيل نموذج التعرّف: $e');
+    }
     if (_disposed) {
       _session = null;
       await session.stop();
