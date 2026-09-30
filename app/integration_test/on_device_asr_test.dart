@@ -32,14 +32,18 @@ void main() {
     print('ASR model loaded in ${clock.elapsed}');
 
     final pcm = (await http.get(Uri.parse(pcmUrl))).bodyBytes;
-    session.partials.listen((text) => print('ASR partial: $text')); // ignore: avoid_print
+    // ignore: avoid_print
+    session.partials.listen((text) => print('ASR partial at ${clock.elapsed}: $text'));
     clock.reset();
-    // 100 ms chunks, a little faster than real time.
+    // 100 ms chunks at the pace of the microphone.
     for (var i = 0; i < pcm.length; i += 3200) {
       session.feed(pcm.sublist(i, (i + 3200).clamp(0, pcm.length)));
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
     }
-    final text = await session.stop().timeout(const Duration(minutes: 3));
+    // ignore: avoid_print
+    print('ASR audio fed in ${clock.elapsed}');
+    // The emulator runs x86 code without the SIMD phones have; allow time.
+    final text = await session.stop().timeout(const Duration(minutes: 8));
     // ignore: avoid_print
     print('ASR final after ${clock.elapsed}: $text');
     final heard = skeleton(normalizeArabic(text));

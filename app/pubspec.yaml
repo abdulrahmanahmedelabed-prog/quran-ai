@@ -24,9 +24,15 @@ dependencies:
 
 # whisper_ggml pulls in FFmpeg (~37 MB of native libraries) only to convert
 # audio files; the app streams PCM, so it is replaced with a stub.
+# whisper_ggml itself is vendored with live recognition tuned for recitation
+# (third_party/whisper_ggml/android/src/whisper/main.cpp, "quran-ai" notes):
+# windows close at the reciter's pauses and live partials decode only the
+# context they need, which keeps phones up with the reciter.
 dependency_overrides:
   ffmpeg_kit_flutter_new_min:
     path: third_party/ffmpeg_kit_stub
+  whisper_ggml:
+    path: third_party/whisper_ggml
 
 dev_dependencies:
   flutter_test:
