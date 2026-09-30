@@ -1,6 +1,6 @@
 name: Build app
 
-# Android APK and Windows zip on every push. iOS: an unsigned IPA on demand
+# Android APKs on every push. iOS: an unsigned IPA on demand
 # (Actions → Build app → Run workflow), since macOS runners are costly.
 on:
   push:
@@ -92,61 +92,6 @@ jobs:
           path: app/quran-ai-unsigned.ipa
           retention-days: 30
 
-  # Windows desktop app, zipped. The tour also runs on the Windows runner as a
-  # smoke test; its screenshots go to the ci-screenshots-windows branch.
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 60
-    permissions:
-      contents: write  # publishes screenshots to ci-screenshots-windows
-    defaults:
-      run:
-        working-directory: app
-        shell: bash
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - name: Build
-        run: |
-          # Native plugins print thousands of warnings; keep errors visible.
-          flutter build windows --release 2>&1 | tee build.log || {
-            grep -nE "error [A-Z]*[0-9]+|: error|Error:|FAILED" build.log | head -n 60
-            exit 1
-          }
-      - name: Package
-        shell: pwsh
-        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath quran-ai-windows.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: quran-ai-windows
-          path: app/quran-ai-windows.zip
-          retention-days: 30
-      - name: Screen tour on Windows
-        id: tour
-        run: |
-          flutter drive --driver=test_driver/integration_test.dart \
-            --target=integration_test/emulator_tour_test.dart -d windows \
-            --dart-define=SCREENSHOT_DIR="$(cygpath -m "$PWD/screenshots")" 2>&1 | tee drive.log
-      - name: Publish screenshots to the ci-screenshots-windows branch
-        if: always() && hashFiles('app/screenshots/*.png') != ''
-        working-directory: app/screenshots
-        run: |
-          git init -q
-          git checkout -q -b ci-screenshots-windows
-          git add .
-          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
-            commit -qm "Windows screenshots for ${GITHUB_SHA}"
-          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" ci-screenshots-windows
-      - name: Check the tour passed
-        if: always() && steps.tour.outcome != 'skipped'
-        run: |
-          tail -n 40 drive.log
-          grep -q "All tests passed" drive.log
-
   # Runs integration_test/emulator_tour_test.dart on an Android emulator and
   # keeps the screenshots (also printed to the log as base64 JPEG).
   android-emulator:
@@ -212,10 +157,10 @@ jobs:
           retention-days: 30
 
   # Direct download links for the README (artifacts need a GitHub login and
-  # come zipped twice): the app-latest release is replaced after every build.
+  # come zipped): the app-latest release is replaced after every build.
   release:
-    needs: [android, windows]
-    if: always() && needs.android.result == 'success' && github.ref_name == github.event.repository.default_branch
+    needs: android
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -224,24 +169,16 @@ jobs:
         with:
           name: quran-ai-android
           path: dist
-      - uses: actions/download-artifact@v4
-        if: needs.windows.result == 'success'
-        with:
-          name: quran-ai-windows
-          path: dist
       - name: Publish the app-latest release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         working-directory: dist
         run: |
-          files="quran-ai-arm64.apk quran-ai-armv7-old-phones.apk"
-          [ -f quran-ai-windows.zip ] && files="$files quran-ai-windows.zip"
           gh release delete app-latest --yes --cleanup-tag || true
-          gh release create app-latest $files --prerelease --target "$GITHUB_SHA" \
+          gh release create app-latest quran-ai-arm64.apk quran-ai-armv7-old-phones.apk --prerelease --target "$GITHUB_SHA" \
             --title "قرآن AI — أحدث نسخة" \
             --notes "نسخة ${GITHUB_SHA::7}. طريقة التثبيت في صفحة المستودع (README).
 
           - quran-ai-arm64.apk: أندرويد، لأغلب الجوالات (منذ 2017 تقريبًا).
-          - quran-ai-armv7-old-phones.apk: أندرويد، للجوالات القديمة 32-بت.
-          - quran-ai-windows.zip: ويندوز 10 أو أحدث (64 بت)."
+          - quran-ai-armv7-old-phones.apk: أندرويد، للجوالات القديمة 32-بت."

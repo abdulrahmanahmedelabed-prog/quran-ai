@@ -9,7 +9,6 @@
 |---|---|
 | 📱 أندرويد — أغلب الجوالات (منذ 2017 تقريبًا) | **[quran-ai-arm64.apk](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/app-latest/quran-ai-arm64.apk)** |
 | 📱 أندرويد — الجوالات القديمة (32-بت) | [quran-ai-armv7-old-phones.apk](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/app-latest/quran-ai-armv7-old-phones.apk) |
-| 💻 ويندوز 10 أو أحدث (64 بت) | **[quran-ai-windows.zip](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/app-latest/quran-ai-windows.zip)** |
 
 الروابط تشير دائمًا إلى أحدث نسخة (إصدار [app-latest](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/tag/app-latest)، يُحدَّث تلقائيًا بعد كل تعديل).
 
@@ -25,14 +24,6 @@
 5. افتح التطبيق ← اختر سورة ← اضغط الميكروفون ← **اسمح** بإذن الميكروفون.
 6. أول مرة فقط يُنزَّل نموذج التعرّف (حوالي 55 ميغا) وتظهر نسبة التنزيل؛ بعدها يعمل التسميع **دون إنترنت**.
    يُفضّل أن يكون الجوال على Wi-Fi في هذه المرة.
-
-### ويندوز
-
-1. نزّل **quran-ai-windows.zip**.
-2. اضغط عليه بالزر الأيمن ← **استخراج الكل (Extract All)**.
-3. افتح المجلد المستخرج وشغّل **quran_ai.exe** (يجب أن يبقى بجانب ملفاته الأخرى في المجلد نفسه).
-4. إذا ظهر تحذير «Windows protected your PC» فاضغط **More info** ← **Run anyway** (الملف غير موقّع رقميًا).
-5. الاشتراك في برو أو بلس يتم من تطبيق الجوال (لا يوجد متجر في ويندوز).
 
 | أثناء التسميع | الهامش بعد التوقف | هامش الآية |
 |---|---|---|
