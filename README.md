@@ -3,15 +3,36 @@
 تطبيق (iOS و Android) يستمع إلى تلاوتك، ويتابعها كلمةً كلمة على المصحف. لا يقاطعك إذا أخطأت:
 يدوّن ملاحظاته بهدوء **في هامش الآية** (الكلمة الخاطئة أو الفائتة، وفي بلس: أحكام التجويد) لتراجعها متى شئت.
 
-## تحميل سريع
+## التحميل والتثبيت
 
-| | الرابط |
+| الجهاز | ملف التحميل (رابط مباشر) |
 |---|---|
-| أندرويد (أغلب الجوالات) | [quran-ai-arm64.apk](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/app-latest/quran-ai-arm64.apk) |
-| أندرويد (الجوالات القديمة 32-بت) | [quran-ai-armv7-old-phones.apk](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/app-latest/quran-ai-armv7-old-phones.apk) |
-| ويندوز | من **Actions ← Build app** ← `quran-ai-windows` (التفاصيل في «تحميل التطبيق» أدناه) |
+| 📱 أندرويد — أغلب الجوالات (منذ 2017 تقريبًا) | **[quran-ai-arm64.apk](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/app-latest/quran-ai-arm64.apk)** |
+| 📱 أندرويد — الجوالات القديمة (32-بت) | [quran-ai-armv7-old-phones.apk](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/app-latest/quran-ai-armv7-old-phones.apk) |
+| 💻 ويندوز 10 أو أحدث (64 بت) | **[quran-ai-windows.zip](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/download/app-latest/quran-ai-windows.zip)** |
 
-روابط أندرويد تتحدّث تلقائيًا مع كل تعديل (إصدار [app-latest](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/tag/app-latest)).
+الروابط تشير دائمًا إلى أحدث نسخة (إصدار [app-latest](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/tag/app-latest)، يُحدَّث تلقائيًا بعد كل تعديل).
+
+### أندرويد
+
+1. افتح رابط **quran-ai-arm64.apk** من متصفح الجوال، وانتظر حتى يكتمل التنزيل (حوالي 25 ميغا).
+   إذا لم يعمل التطبيق على جوال قديم فاستخدم ملف **armv7** بدلًا منه.
+2. اضغط على الملف من الإشعارات أو من مجلد «التنزيلات».
+3. إذا ظهرت رسالة «التثبيت من مصادر غير معروفة» فاضغط **الإعدادات** ← فعّل **السماح من هذا المصدر**
+   ← ارجع واضغط **تثبيت**. (في شاومي قد تظهر رسالة فحص الأمان؛ اضغط «تثبيت على أي حال».)
+4. **إذا كانت عندك نسخة سابقة** وظهرت رسالة «لم يتم تثبيت التطبيق»: احذف النسخة القديمة أولًا ثم ثبّت
+   الجديدة، لأن النسخ التجريبية الحالية موقّعة بمفاتيح مختلفة.
+5. افتح التطبيق ← اختر سورة ← اضغط الميكروفون ← **اسمح** بإذن الميكروفون.
+6. أول مرة فقط يُنزَّل نموذج التعرّف (حوالي 55 ميغا) وتظهر نسبة التنزيل؛ بعدها يعمل التسميع **دون إنترنت**.
+   يُفضّل أن يكون الجوال على Wi-Fi في هذه المرة.
+
+### ويندوز
+
+1. نزّل **quran-ai-windows.zip**.
+2. اضغط عليه بالزر الأيمن ← **استخراج الكل (Extract All)**.
+3. افتح المجلد المستخرج وشغّل **quran_ai.exe** (يجب أن يبقى بجانب ملفاته الأخرى في المجلد نفسه).
+4. إذا ظهر تحذير «Windows protected your PC» فاضغط **More info** ← **Run anyway** (الملف غير موقّع رقميًا).
+5. الاشتراك في برو أو بلس يتم من تطبيق الجوال (لا يوجد متجر في ويندوز).
 
 | أثناء التسميع | الهامش بعد التوقف | هامش الآية |
 |---|---|---|
@@ -107,24 +128,17 @@ tools/    بناء بيانات المصحف، وتحويل النموذج إل�
   الحركات يحتاج نموذجًا يُخرجه. وأحكام مثل الغنة والإخفاء تُلوَّن ولا تُفحص صوتيًا بعد.
   وتوقيت الكلمات متاح عبر الخادم فقط؛ المحرّك على الجهاز يعطي النص وحده.
 
-## تحميل التطبيق (ملفات التشغيل)
+## ملفات البناء (للمطوّر)
 
-يبني GitHub Actions ملفات التطبيق تلقائيًا (ملف `.github/workflows/build.yml`):
+يبني GitHub Actions ملفات التطبيق تلقائيًا مع كل تعديل (`.github/workflows/build.yml`) وينشرها في إصدار
+`app-latest` (الروابط في أعلى الصفحة). وفي **Actions ← Build app** توجد أيضًا:
 
-- **أندرويد (APK):** يُبنى مع كل تعديل على التطبيق ويُنشر في إصدار
-  [app-latest](https://github.com/abdulrahmanahmedelabed-prog/quran-ai/releases/tag/app-latest) (الروابط في
-  أعلى الصفحة): `quran-ai-arm64.apk` لأغلب الجوالات منذ 2017 تقريبًا، و`quran-ai-armv7-old-phones.apk`
-  للجوالات القديمة. نزّله على الجوال واسمح بالتثبيت من مصادر غير معروفة. (النسخ نفسها ومعها ملف
-  Google Play ‏`.aab` موجودة أيضًا في **Actions ← Build app** ← `quran-ai-android`.)
-- **ويندوز:** يُبنى مع كل تعديل أيضًا. من **Actions ← Build app** نزّل `quran-ai-windows`، وفكّ الضغط
-  مرتين، ثم شغّل `quran_ai.exe` (ويندوز 10 أو أحدث، 64 بت). عند أول تشغيل قد يظهر تحذير SmartScreen لأن
-  الملف غير موقّع: اضغط «مزيد من المعلومات» ثم «تشغيل على أي حال». الاشتراك لا يتم من ويندوز (لا يوجد
-  متجر)، بل من تطبيق الجوال.
-- **آيفون (IPA غير موقّع):** من **Actions ← Build app ← Run workflow**. آبل لا تسمح بتثبيت تطبيق غير
-  موقّع مباشرة؛ ثبّته بأداة مثل Sideloadly أو AltStore بحساب Apple ID (تنتهي صلاحيته بعد 7 أيام للحساب
-  المجاني)، أو اشترك في Apple Developer Program (99 دولارًا سنويًا) ووزّعه عبر TestFlight.
-- الـ APK الحالي موقّع بمفتاح التطوير، وهو يتغيّر مع كل بناء؛ لذلك احذف النسخة القديمة من الجوال قبل
-  تثبيت الجديدة. للنشر على Google Play (وللتحديث فوق القديمة) أنشئ مفتاح توقيع خاصًّا (keystore).
+- `quran-ai-android`: ملفات APK لكل معالج، وملف `quran-ai-google-play.aab` للنشر على Google Play.
+- **آيفون (IPA غير موقّع):** من **Actions ← Build app ← Run workflow** مع خيار iOS. آبل لا تسمح بتثبيت
+  تطبيق غير موقّع مباشرة؛ ثبّته بأداة مثل Sideloadly أو AltStore بحساب Apple ID (تنتهي صلاحيته بعد 7 أيام
+  للحساب المجاني)، أو اشترك في Apple Developer Program (99 دولارًا سنويًا) ووزّعه عبر TestFlight.
+- ملفات APK الحالية موقّعة بمفتاح التطوير، وهو يتغيّر مع كل بناء. للنشر على Google Play (وللتحديث فوق
+  النسخة القديمة دون حذفها) أنشئ مفتاح توقيع ثابتًا (keystore) واحفظه في أسرار المستودع (Secrets).
 
 ## التشغيل
 

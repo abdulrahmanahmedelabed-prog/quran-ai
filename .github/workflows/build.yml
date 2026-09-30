@@ -21,8 +21,6 @@ on:
 jobs:
   android:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # publishes the APKs to the app-latest release
     defaults:
       run:
         working-directory: app
@@ -66,20 +64,6 @@ jobs:
           name: quran-ai-android
           path: app/build/app/outputs/dist/
           retention-days: 30
-      # Direct download links for phones (artifacts need a GitHub login and
-      # come zipped): the release is replaced with every build.
-      - name: Publish the app-latest release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cd build/app/outputs/dist
-          gh release delete app-latest --yes --cleanup-tag || true
-          gh release create app-latest quran-ai-arm64.apk quran-ai-armv7-old-phones.apk \
-            --prerelease --target "$GITHUB_SHA" --title "قرآن AI — أحدث نسخة أندرويد" \
-            --notes "نسخة ${GITHUB_SHA::7} من فرع ${GITHUB_REF_NAME}.
-
-          - quran-ai-arm64.apk: لأغلب الجوالات (منذ 2017 تقريبًا).
-          - quran-ai-armv7-old-phones.apk: للجوالات القديمة 32-بت."
 
   ios:
     if: github.event_name == 'workflow_dispatch' && inputs.ios
@@ -226,3 +210,38 @@ jobs:
           name: emulator-screenshots
           path: app/screenshots/
           retention-days: 30
+
+  # Direct download links for the README (artifacts need a GitHub login and
+  # come zipped twice): the app-latest release is replaced after every build.
+  release:
+    needs: [android, windows]
+    if: always() && needs.android.result == 'success' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: quran-ai-android
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.windows.result == 'success'
+        with:
+          name: quran-ai-windows
+          path: dist
+      - name: Publish the app-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        working-directory: dist
+        run: |
+          files="quran-ai-arm64.apk quran-ai-armv7-old-phones.apk"
+          [ -f quran-ai-windows.zip ] && files="$files quran-ai-windows.zip"
+          gh release delete app-latest --yes --cleanup-tag || true
+          gh release create app-latest $files --prerelease --target "$GITHUB_SHA" \
+            --title "قرآن AI — أحدث نسخة" \
+            --notes "نسخة ${GITHUB_SHA::7}. طريقة التثبيت في صفحة المستودع (README).
+
+          - quran-ai-arm64.apk: أندرويد، لأغلب الجوالات (منذ 2017 تقريبًا).
+          - quran-ai-armv7-old-phones.apk: أندرويد، للجوالات القديمة 32-بت.
+          - quran-ai-windows.zip: ويندوز 10 أو أحدث (64 بت)."
