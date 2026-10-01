@@ -37,9 +37,34 @@ class RecognitionException implements Exception {
   String toString() => message;
 }
 
-/// Removes annotations recognizers emit for non-speech sounds ([موسيقى]).
-String cleanTranscript(String text) =>
-    text.replaceAll(RegExp(r'\[[^\]]*\]|\([^)]*\)|\*[^*]*\*'), ' ').trim();
+/// Removes annotations recognizers emit for non-speech sounds ([موسيقى]),
+/// and decoding loops (see [collapseLoops]).
+String cleanTranscript(String text) => collapseLoops(
+  text.replaceAll(RegExp(r'\[[^\]]*\]|\([^)]*\)|\*[^*]*\*'), ' ').replaceAll(RegExp(' {2,}'), ' ').trim(),
+);
+
+/// Cuts a phrase of two or more words repeated three or more times in a row
+/// back to one occurrence, and drops what follows it. On audio cut mid-word,
+/// Whisper sometimes loops ("لم يلد ولا لم يلد ولا لم يلد ولا…") until the
+/// next partial corrects it; the Quran never repeats a phrase like that, and
+/// the looping tail would only mislead the tracker.
+String collapseLoops(String text) {
+  // Words are separated by spaces only (2:72 has a thin space inside a word).
+  final words = text.split(RegExp(r' +')).where((w) => w.isNotEmpty).toList();
+  for (var start = 0; start < words.length; start++) {
+    for (var n = 2; start + 3 * n <= words.length; n++) {
+      bool same(int k) {
+        for (var i = 0; i < n; i++) {
+          if (words[start + i] != words[start + k * n + i]) return false;
+        }
+        return true;
+      }
+
+      if (same(1) && same(2)) return words.take(start + n).join(' ');
+    }
+  }
+  return text;
+}
 
 /// Microphone capture as 16 kHz mono PCM16, the format Whisper expects.
 class Microphone {
@@ -55,18 +80,16 @@ class Microphone {
   Future<void> ensurePermission() async {
     if (!await _recorder.hasPermission()) {
       throw const RecognitionException(
-          'التطبيق يحتاج إذن الميكروفون ليسمع تلاوتك. فعّله من إعدادات الجوال ← التطبيقات ← قرآن AI ← الأذونات.');
+        'التطبيق يحتاج إذن الميكروفون ليسمع تلاوتك. فعّله من إعدادات الجوال ← التطبيقات ← قرآن AI ← الأذونات.',
+      );
     }
   }
 
   Future<Stream<Uint8List>> start() async {
     await ensurePermission();
-    final stream = await _recorder.startStream(const RecordConfig(
-      encoder: AudioEncoder.pcm16bits,
-      sampleRate: sampleRate,
-      numChannels: 1,
-      noiseSuppress: true,
-    ));
+    final stream = await _recorder.startStream(
+      const RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: sampleRate, numChannels: 1, noiseSuppress: true),
+    );
     return stream.map((chunk) {
       _levels.add(_level(chunk));
       return chunk;
