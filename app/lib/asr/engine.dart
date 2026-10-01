@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
 
 import '../core/recitation_review.dart';
@@ -73,11 +73,17 @@ class Microphone {
 
   static const sampleRate = 16000;
 
+  /// Replaces the recorder in end-to-end tests, which play a recitation
+  /// into the whole app (the CI emulator has no one to speak into it).
+  @visibleForTesting
+  static Stream<Uint8List> Function()? debugAudioSource;
+
   Stream<double> get levels => _levels.stream;
 
   /// Asks for microphone access (the system prompt appears on first use).
   /// Engines call this before any slow setup, so the prompt shows at once.
   Future<void> ensurePermission() async {
+    if (debugAudioSource != null) return;
     if (!await _recorder.hasPermission()) {
       throw const RecognitionException(
         'التطبيق يحتاج إذن الميكروفون ليسمع تلاوتك. فعّله من إعدادات الجوال ← التطبيقات ← قرآن AI ← الأذونات.',
@@ -86,14 +92,18 @@ class Microphone {
   }
 
   Future<Stream<Uint8List>> start() async {
+    final injected = debugAudioSource;
+    if (injected != null) return injected().map(_metered);
     await ensurePermission();
     final stream = await _recorder.startStream(
       const RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: sampleRate, numChannels: 1, noiseSuppress: true),
     );
-    return stream.map((chunk) {
-      _levels.add(_level(chunk));
-      return chunk;
-    });
+    return stream.map(_metered);
+  }
+
+  Uint8List _metered(Uint8List chunk) {
+    if (!_levels.isClosed) _levels.add(_level(chunk));
+    return chunk;
   }
 
   Future<void> stop() async {
