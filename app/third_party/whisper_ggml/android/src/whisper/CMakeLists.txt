@@ -45,6 +45,11 @@ target_compile_definitions(whisper PRIVATE
 # No -march override: the previous armv8.2-a+fp16 flags SIGILLed on
 # armv8.0 devices (issue #15). Baseline armv8-a runs everywhere.
 target_compile_options(whisper PRIVATE -O3 -ffunction-sections -fdata-sections)
+# quran-ai: the x86_64 build only runs on emulators (phones are arm), whose
+# hosts have AVX2; without it whisper runs several times slower there.
+if(ANDROID_ABI STREQUAL "x86_64")
+    target_compile_options(whisper PRIVATE -mavx -mavx2 -mfma -mf16c)
+endif()
 
 add_library(whisper_flutter SHARED main.cpp)
 set_target_properties(whisper_flutter PROPERTIES OUTPUT_NAME "whisper")

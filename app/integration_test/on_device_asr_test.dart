@@ -1,6 +1,6 @@
 // Runs the real on-device recognizer on an emulator: downloads the Quran
 // model as the app does, loads it with whisper.cpp and transcribes recited
-// al-Fatiha served by the CI host (ASR_PCM_URL, 16 kHz mono PCM16).
+// al-Ikhlas served by the CI host (ASR_PCM_URL, 16 kHz mono PCM16).
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -15,7 +15,7 @@ const pcmUrl = String.fromEnvironment('ASR_PCM_URL');
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('the Quran model loads and recognizes al-Fatiha', (tester) async {
+  testWidgets('the Quran model loads and recognizes al-Ikhlas', (tester) async {
     final clock = Stopwatch()..start();
     final path = await ModelManager(modelUrl: '').ensure();
     // ignore: avoid_print
@@ -42,12 +42,11 @@ void main() {
     }
     // ignore: avoid_print
     print('ASR audio fed in ${clock.elapsed}');
-    // The emulator runs x86 code without the SIMD phones have; allow time.
-    final text = await session.stop().timeout(const Duration(minutes: 8));
+    final text = await session.stop().timeout(const Duration(minutes: 3));
     // ignore: avoid_print
     print('ASR final after ${clock.elapsed}: $text');
     final heard = skeleton(normalizeArabic(text));
-    for (final word in ['الحمد', 'العالمين']) {
+    for (final word in ['أحد', 'الصمد', 'يولد', 'كفوا']) {
       expect(heard, contains(skeleton(normalizeArabic(word))));
     }
   }, timeout: const Timeout(Duration(minutes: 20)));
