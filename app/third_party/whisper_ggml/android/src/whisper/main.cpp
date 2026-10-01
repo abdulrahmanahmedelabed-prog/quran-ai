@@ -535,10 +535,11 @@ static void stream_dispose_ctx()
     g_stream.park_on_stop = false;
 }
 
-static const size_t STREAM_STEP_SAMPLES   = (size_t)(1.5 * WHISPER_SAMPLE_RATE);
+// quran-ai: a live partial every 2 s of new speech (was 1.5 s).
+static const size_t STREAM_STEP_SAMPLES   = (size_t)(2.0 * WHISPER_SAMPLE_RATE);
 // quran-ai: windows are closed at the reciter's pauses (normally one ayah),
-// so they stay short; a long ayah without a pause is cut at this length.
-static const size_t STREAM_COMMIT_SAMPLES = (size_t)(20.0 * WHISPER_SAMPLE_RATE);
+// so they stay short; a stretch without a pause is cut at this length.
+static const size_t STREAM_COMMIT_SAMPLES = (size_t)(12.0 * WHISPER_SAMPLE_RATE);
 // A pause this long after at least STREAM_MIN_WINDOW of speech closes the
 // window: it is decoded once more at full quality and committed.
 static const size_t STREAM_PAUSE_SAMPLES  = (size_t)(0.45 * WHISPER_SAMPLE_RATE);
@@ -591,11 +592,11 @@ static json stream_run_inference(bool commit = false)
     const float seconds = (float)n_decode / WHISPER_SAMPLE_RATE;
     wparams.temperature_inc = 0.0f;
     wparams.max_tokens = (int)(20.0f * seconds) + 8;
-    if (!commit) {
-        // Live partials encode only as much context as the audio needs
-        // (1500 = 30 s), about 3x faster on short windows.
-        wparams.audio_ctx = (int)std::min<size_t>(1500, n_decode * 50 / WHISPER_SAMPLE_RATE + 64);
-    }
+    // Encode only as much context as the audio needs (1500 = 30 s), with
+    // more slack for the final decode of a window; about 3x faster on
+    // ayah-long windows with the same words recognized.
+    const size_t slack = commit ? 256 : 64;
+    wparams.audio_ctx = (int)std::min<size_t>(1500, n_decode * 50 / WHISPER_SAMPLE_RATE + slack);
 
     if (whisper_full(g_stream.ctx, wparams, g_stream.pcmf32.data(),
                      (int)n_decode) != 0) {
