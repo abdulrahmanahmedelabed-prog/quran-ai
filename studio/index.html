@@ -1245,7 +1245,32 @@ async function toEnglish(text, signal) {
   out = (out || '').trim();
   if (!out || isAr(out)) out = await translateFree(text, signal);
   if (!out || isAr(out)) throw { code: 'translate' };
+  out = withHints(text, out);
   trCache.set(text, out); return out;
+}
+/* Arabic words whose plain English translation misleads an image model ("caravan" draws a camper van).
+   When the Arabic prompt mentions one, its unambiguous meaning is put at the front of the English prompt. */
+const AR_HINTS = [
+  [/قافل|قوافل/, 'camel caravan: a long line of camels carrying travelers and goods, no cars, no vehicles'],
+  [/جمل|جمال|إبل|ابل|ناق|هجن/, 'camels'],
+  [/خيم/, 'traditional bedouin tents'],
+  [/واح/, 'desert oasis with date palm trees and water'],
+  [/بدو|بدوي/, 'bedouin people in traditional robes'],
+  [/فانوس|فوانيس/, 'traditional Ramadan lantern (fanous) of brass and colored glass'],
+  [/دل[ةه]\b|دلال/, 'traditional Arabic dallah coffee pot'],
+  [/قهوة عربي/, 'Arabic coffee in small finjan cups'],
+  [/مسجد|جامع|مساجد/, 'mosque with minaret and dome'],
+  [/هلال/, 'crescent moon'],
+  [/كعب[ةه]/, 'the Kaaba in Mecca'],
+  [/نخل/, 'date palm trees'],
+  [/صقر|صقور/, 'falcon'],
+  [/مبخر|بخور/, 'traditional Arabic incense burner (mabkhara) with smoke'],
+  [/عباي|عباء/, 'traditional black abaya'],
+  [/شماغ|غتر[ةه]|عقال/, 'traditional Arab headdress (shemagh with agal)'],
+];
+function withHints(ar, en) {
+  const hints = AR_HINTS.filter(([re]) => re.test(ar)).map(([, h]) => h);
+  return hints.length ? `${hints.join('; ')}. ${en}` : en;
 }
 /* Free translators tried in order; each one may be down or rate limited. */
 async function translateFree(text, signal) {
