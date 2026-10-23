@@ -1249,10 +1249,11 @@ async function toEnglish(text, signal) {
   trCache.set(text, out); return out;
 }
 /* Arabic words whose plain English translation misleads an image model ("caravan" draws a camper van).
-   When the Arabic prompt mentions one, its unambiguous meaning is put at the front of the English prompt. */
+   When the Arabic prompt mentions one, its unambiguous meaning is put at the front of the English prompt.
+   Hints are phrased positively only: image models ignore "no", so "no vehicles" draws vehicles. */
 const AR_HINTS = [
-  [/قافل|قوافل/, 'camel caravan: a long line of camels carrying travelers and goods, no cars, no vehicles'],
-  [/جمل|جمال|إبل|ابل|ناق|هجن/, 'camels'],
+  [/قافل|قوافل/, 'a long camel caravan walking in single file across sand dunes, riders in robes sitting on the camels, cargo bundles tied to their humps'],
+  [/جمل|جمال|إبل|ابل|ناق|هجن/, 'dromedary camels with complete heads, long curved necks and full bodies, anatomically correct'],
   [/خيم/, 'traditional bedouin tents'],
   [/واح/, 'desert oasis with date palm trees and water'],
   [/بدو|بدوي/, 'bedouin people in traditional robes'],
@@ -1290,14 +1291,20 @@ async function translateFree(text, signal) {
 async function genHF(prompt, style, w, hh, seed, signal) {
   if (!AI.hf) throw { code: 'hf_key' };
   const en = await toEnglish(prompt, signal);
-  const r = await fetch('https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell', {
-    method: 'POST', signal, headers: { Authorization: 'Bearer ' + AI.hf, 'Content-Type': 'application/json', Accept: 'image/png' },
-    body: JSON.stringify({ inputs: en + ', ' + style, parameters: { width: w, height: hh, seed: seed % 2147483647, num_inference_steps: 4 } }) });
-  if (!r.ok) throw { code: 'http', status: r.status, hf: true };
-  const b = await r.blob();
-  if (!b.type.startsWith('image/')) throw { code: 'http', status: 502 };
-  return b;
+  const hf = await loadHF();
+  try {
+    const b = await hf.textToImage({ accessToken: AI.hf, provider: 'auto', model: AI.hfModel, inputs: en + ', ' + style,
+      parameters: { width: w, height: hh, seed: seed % 2147483647 } }, { outputType: 'blob', signal });
+    if (!b || !b.size) throw { code: 'http', status: 502, hf: true };
+    return b;
+  } catch (e) {
+    const x = hfRaw(e, signal);
+    if (x.code === 'hf_fail' && /429|rate/i.test(x.detail || '')) throw { code: 'http', status: 429, hf: true };
+    throw x;
+  }
 }
+const HF_IMG_MODELS = [['black-forest-labs/FLUX.1-dev', 'FLUX.1 dev · أعلى جودة'], ['Qwen/Qwen-Image', 'Qwen Image · ممتاز للتفاصيل'], ['black-forest-labs/FLUX.1-schnell', 'FLUX.1 schnell · الأسرع والأرخص']];
+try { AI.hfModel = localStorage.getItem('lamsa-hf-model') || HF_IMG_MODELS[0][0]; } catch (e) { AI.hfModel = HF_IMG_MODELS[0][0]; }
 function cleanSvg(text, w, hh) {
   const m = String(text).match(/<svg[\s\S]*<\/svg>/i); if (!m) throw { code: 'empty_completion' };
   const doc = new DOMParser().parseFromString(m[0], 'image/svg+xml');
@@ -1530,9 +1537,10 @@ function renderAI(add) {
   add(sec('الأسلوب', ctlSeg(null, AI, 'style', AI_STYLES.map(([k, n]) => [k, n]))));
   add(sec('المحرّك',
     engines.length > 1 ? ctlSeg(null, AI, 'engine', engines, () => renderTools()) : null,
-    AI.engine === 'flux' ? [h('p', { class: 'hint' }, 'نموذج Flux عبر خدمة Pollinations المجانية، بلا تسجيل. الخدمة تحدّ من سرعة الطلبات، والبرنامج يعيد المحاولة تلقائيًا عند الانشغال.'),
+    AI.engine === 'flux' ? [h('p', { class: 'hint' }, 'محرك مجاني بلا تسجيل عبر Pollinations، مناسب للمناظر والخلفيات لكنه قد يشوّه الحيوانات والوجوه. للدقة العالية استخدم Hugging Face. الخدمة تحدّ من سرعة الطلبات، والبرنامج يعيد المحاولة تلقائيًا.'),
       h('details', {}, h('summary', { class: 'hint', style: 'cursor:pointer' }, 'مفتاح Pollinations (اختياري، لسرعة أعلى)'), keyInput(null, 'key', 'lamsa-ai-key', 'اتركه فارغًا للاستخدام المجاني'))] : null,
-    AI.engine === 'hf' ? [h('p', { class: 'hint' }, 'FLUX.1-schnell على Hugging Face بمفتاحك. الحساب المجاني له رصيد شهري صغير، والاشتراك المدفوع يرفعه. الوصف العربي يُترجم تلقائيًا.'),
+    AI.engine === 'hf' ? [h('p', { class: 'hint' }, 'نماذج احترافية على Hugging Face بمفتاحك، أدق بكثير من المحرك المجاني في الحيوانات والوجوه والأيدي. الحساب المجاني له رصيد شهري صغير، والاشتراك المدفوع يرفعه.'),
+      ctlSelect('النموذج', AI, 'hfModel', HF_IMG_MODELS, () => { try { localStorage.setItem('lamsa-hf-model', AI.hfModel); } catch (e) {} }),
       keyInput('مفتاح Hugging Face', 'hf', 'lamsa-hf-key', 'hf_...'),
       h('p', { class: 'hint' }, 'يُحفظ المفتاح في متصفحك فقط ويُرسل إلى Hugging Face وحدها.')] : null,
     AI.engine === 'claude' ? h('p', { class: 'hint' }, 'Claude يرسم لوحة فنية متجهية مفصّلة. أنسب للرسوم والشعارات والخلفيات الزخرفية منه للصور الفوتوغرافية، ويستغرق نصف دقيقة إلى دقيقتين للصورة.') : null,
