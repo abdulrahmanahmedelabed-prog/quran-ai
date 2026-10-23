@@ -1,0 +1,1472 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>استوديو لمسة</title>
+<meta name="description" content="استوديو مجاني لتصميم الصور والفيديو يعمل من المتصفح مباشرة، دون تثبيت.">
+<meta name="theme-color" content="#121015">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Aref+Ruqaa:wght@400;700&family=Cairo:wght@400;700;900&family=Changa:wght@400;700;800&family=El+Messiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Lalezar&family=Marhey:wght@400;700&family=Noto+Kufi+Arabic:wght@400;700;900&family=Playfair+Display:wght@400;700;900&family=Reem+Kufi:wght@400;700&family=Scheherazade+New:wght@400;700&family=Tajawal:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: editor shell. Tool rail and tool panel on the reading (right) side, stage in the centre, properties opposite; on phones the stage sits over a sheet with a bottom tab bar. */
+:root{
+  --ink:#121015; --panel:#19161d; --raise:#231f28; --line:#302a35; --fg:#f2ece2; --muted:#a0969d;
+  --gold:#d4b06a; --gold-hi:#f0d79c; --on-gold:#1a1408; --danger:#e57361; --stage:#0b090d; --dot:#1c1820;
+  --f-display:"Reem Kufi","Noto Kufi Arabic",serif;
+  --f-body:"IBM Plex Sans Arabic","Tajawal",system-ui,sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){ --ink:#e9e7ec; --panel:#fbfafc; --raise:#f0eef3; --line:#dcd8e1; --fg:#1d1a21; --muted:#665f6c;
+    --gold:#94702f; --gold-hi:#7a5a1f; --on-gold:#fffaf0; --danger:#b8442f; --stage:#d7d3db; --dot:#c9c4ce; color-scheme:light }
+}
+:root[data-theme="light"]{ --ink:#e9e7ec; --panel:#fbfafc; --raise:#f0eef3; --line:#dcd8e1; --fg:#1d1a21; --muted:#665f6c;
+  --gold:#94702f; --gold-hi:#7a5a1f; --on-gold:#fffaf0; --danger:#b8442f; --stage:#d7d3db; --dot:#c9c4ce; color-scheme:light }
+:root[data-theme="dark"]{ --ink:#121015; --panel:#19161d; --raise:#231f28; --line:#302a35; --fg:#f2ece2; --muted:#a0969d;
+  --gold:#d4b06a; --gold-hi:#f0d79c; --on-gold:#1a1408; --danger:#e57361; --stage:#0b090d; --dot:#1c1820; color-scheme:dark }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--fg);font:14px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+.app{height:100%;display:grid;grid-template-columns:76px 300px minmax(0,1fr) 312px;grid-template-rows:58px minmax(0,1fr) auto;
+  grid-template-areas:"top top top top" "rail tools stage props" "rail tools time props"}
+
+/* top bar */
+.top{grid-area:top;display:flex;align-items:center;gap:10px;padding-inline:16px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+.brand{display:flex;align-items:center;gap:10px;margin-inline-end:auto;min-width:0}
+.brand svg{width:30px;height:30px;flex:none}
+.brand b{font:700 23px/1 var(--f-display);color:var(--gold)}
+.brand small{color:var(--muted);font-size:12px;white-space:nowrap}
+.top select{max-width:220px;min-width:0;padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:var(--raise)}
+.ibtn{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--raise);color:var(--fg);padding:0;flex:none}
+.ibtn:disabled{opacity:.35;cursor:default}
+.ibtn.sm{width:32px;height:32px;border-radius:8px}
+.ibtn.sm svg.i{width:17px;height:17px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font-weight:500;text-align:center}
+.btn:hover,.ibtn:hover:not(:disabled){border-color:color-mix(in srgb,var(--gold) 55%,var(--line))}
+.btn.gold{background:var(--gold);color:var(--on-gold);border-color:transparent;font-weight:600}
+.btn.gold:hover{background:var(--gold-hi);color:var(--on-gold)}
+.btn.block{width:100%}
+.btn.danger{color:var(--danger)}
+
+/* rail */
+.rail{grid-area:rail;display:flex;flex-direction:column;gap:4px;padding:10px 8px;background:var(--panel);border-inline-end:1px solid var(--line);overflow:auto}
+.rail button{display:grid;justify-items:center;gap:4px;padding:10px 2px 8px;border:0;border-radius:12px;background:none;color:var(--muted);font-size:11.5px;line-height:1.2}
+.rail button[aria-current="true"]{background:var(--raise);color:var(--gold)}
+.rail button:hover{color:var(--fg)}
+.rail .only-m{display:none}
+
+/* panels */
+.panel{background:var(--panel);overflow:auto;padding:4px 16px 40px;min-width:0}
+.tools{grid-area:tools;border-inline-end:1px solid var(--line)}
+.props{grid-area:props;border-inline-start:1px solid var(--line)}
+.ptitle{font:700 18px/1.3 var(--f-display);margin:16px 0 4px;color:var(--fg)}
+.psub{margin:0 0 4px;color:var(--muted);font-size:12.5px}
+.sec{display:grid;gap:12px;padding-block:16px;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.sec>h3{margin:0;font-size:12.5px;font-weight:600;color:var(--muted)}
+.ctl{display:grid;gap:6px;min-width:0}
+.ctl>label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px}
+.ctl output{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+input[type=range]{width:100%;accent-color:var(--gold);margin:0;direction:ltr}
+input[type=color]{width:40px;height:30px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;flex:none}
+input[type=number],input[type=text],select,textarea{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--raise)}
+textarea{resize:vertical;min-height:84px;line-height:1.6}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.colrow{display:flex;gap:10px;align-items:center}
+.sw{display:flex;flex-wrap:wrap;gap:5px}
+.sw button{width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--c);padding:0}
+.seg{display:flex;flex-wrap:wrap;gap:3px;padding:3px;border-radius:11px;background:var(--raise)}
+.seg button{flex:1 1 auto;padding:6px 8px;border:0;border-radius:8px;background:none;color:var(--muted);font-size:12.5px;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--gold);box-shadow:0 0 0 1px var(--line)}
+.tog{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;cursor:pointer}
+.tog input{appearance:none;width:38px;height:22px;border-radius:22px;background:var(--line);position:relative;margin:0;cursor:pointer;flex:none;transition:background .15s}
+.tog input::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:16px;height:16px;border-radius:50%;background:var(--fg);transition:inset-inline-start .15s}
+.tog input:checked{background:var(--gold)}
+.tog input:checked::after{inset-inline-start:19px;background:var(--on-gold)}
+.hint{margin:0;color:var(--muted);font-size:12.5px;line-height:1.7}
+.note{padding:10px 12px;border-radius:10px;background:var(--raise);color:var(--muted);font-size:12.5px;line-height:1.7}
+
+/* cards */
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.card{display:grid;gap:6px;padding:8px;border-radius:12px;border:1px solid var(--line);background:var(--raise);text-align:start;min-width:0}
+.card:hover{border-color:var(--gold)}
+.card canvas,.card .thumb{width:100%;aspect-ratio:1;object-fit:contain;border-radius:8px;background:var(--stage);display:block}
+.card span{font-weight:600;font-size:13px}
+.card small{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+.style-card{min-height:84px;display:grid;place-items:center;padding:10px 6px;border-radius:12px;border:1px solid var(--line);background:#141116;color:#fff;font-size:24px;line-height:1.2;overflow:hidden}
+.style-card:hover{border-color:var(--gold)}
+.shape-btn{aspect-ratio:1;display:grid;place-items:center;border-radius:12px;border:1px solid var(--line);background:var(--raise);padding:6px}
+.shape-btn:hover{border-color:var(--gold)}
+.shape-btn canvas{width:100%;height:100%}
+.fonts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.fonts button{padding:8px 6px;border-radius:10px;border:1px solid var(--line);background:var(--raise);font-size:17px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fonts button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.grads{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.grads button{aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--g);padding:0}
+.media-thumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--stage);padding:0}
+.media-thumb img,.media-thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.media-thumb em{position:absolute;inset-inline-start:4px;bottom:4px;font-style:normal;font-size:10.5px;padding:1px 6px;border-radius:6px;background:rgb(0 0 0 / .6);color:#fff}
+
+/* layers list */
+.layers{display:grid;gap:6px}
+.layer{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;border:1px solid var(--line);background:var(--raise);min-width:0}
+.layer[aria-selected="true"]{border-color:var(--gold)}
+.layer .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:none;border:0;text-align:start;padding:4px 0}
+.layer .ibtn{width:28px;height:28px;border-radius:7px;background:none;border-color:transparent}
+.layer .ibtn svg.i{width:16px;height:16px}
+.layer .ty{color:var(--gold);display:grid}
+.phead{display:flex;align-items:center;gap:10px;padding-block:14px 12px;border-bottom:1px solid var(--line)}
+.phead>div:first-child{flex:1;min-width:0;display:grid}
+.phead small{color:var(--muted);font-size:12px}
+.phead strong{font:700 16px/1.3 var(--f-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acts{display:flex;gap:6px}
+
+/* stage */
+.stage{grid-area:stage;position:relative;display:grid;place-items:center;overflow:hidden;background-color:var(--stage);
+  background-image:radial-gradient(var(--dot) 1px,transparent 1.2px);background-size:22px 22px;touch-action:none}
+.stage canvas{display:block;box-shadow:0 24px 70px rgb(0 0 0 / .45),0 0 0 1px rgb(255 255 255 / .06);touch-action:none;cursor:default}
+.stage.drop::after{content:"أفلت الملفات هنا";position:absolute;inset:16px;display:grid;place-items:center;border:2px dashed var(--gold);border-radius:18px;background:rgb(0 0 0 / .45);color:#fff;font:700 22px var(--f-display)}
+.zoomtag{position:absolute;bottom:10px;inset-inline-start:12px;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none}
+
+/* timeline */
+.time{grid-area:time;background:var(--panel);border-top:1px solid var(--line);padding:8px 16px 10px;display:grid;gap:6px;min-width:0}
+.tbar{display:flex;align-items:center;gap:10px;direction:ltr;min-width:0}
+.tbar .play{width:40px;height:40px;border-radius:50%;background:var(--gold);color:var(--on-gold);border:0}
+.tbar .play svg.i{width:18px;height:18px}
+.tbar .tc{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.tbar input[type=range]{flex:1;min-width:60px}
+.tbar label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);direction:rtl;white-space:nowrap}
+.tbar input[type=number]{width:64px;padding:5px 6px}
+.tracks{position:relative;direction:ltr;display:grid;gap:3px;max-height:66px;overflow:auto}
+.track{position:relative;height:12px;border-radius:4px;background:var(--raise);cursor:pointer;border:0;padding:0;width:100%}
+.track i{position:absolute;top:2px;bottom:2px;border-radius:3px;background:color-mix(in srgb,var(--gold) 45%,var(--raise))}
+.track[aria-selected="true"] i{background:var(--gold)}
+.playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--fg);pointer-events:none;opacity:.7}
+
+/* modal + toast */
+.modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgb(0 0 0 / .55)}
+.sheet{width:min(480px,100%);max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:16px}
+.sheet header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sheet h2{margin:0;font:700 20px/1.3 var(--f-display)}
+.exgrid{display:grid;gap:8px}
+.exopt{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--raise);text-align:start;width:100%}
+.exopt:hover{border-color:var(--gold)}
+.exopt span{display:grid;flex:1}
+.exopt b{font-weight:600}
+.exopt small{color:var(--muted);font-size:12px}
+.exopt svg.i{color:var(--gold)}
+.progress{height:8px;border-radius:8px;background:var(--raise);overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s linear}
+.toast{position:fixed;z-index:60;inset-inline:0;margin-inline:auto;bottom:calc(24px + env(safe-area-inset-bottom,0px));width:max-content;max-width:calc(100% - 32px);
+  padding:10px 16px;border-radius:12px;background:var(--fg);color:var(--ink);font-weight:500;box-shadow:0 10px 30px rgb(0 0 0 / .3);transition:opacity .2s,transform .2s}
+.toast[data-hide]{opacity:0;transform:translateY(8px);pointer-events:none}
+.pool{position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden;inset-inline-start:0;top:0}
+
+@media (max-width: 959px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:54px minmax(0,1fr) auto minmax(0,42%) auto;
+    grid-template-areas:"top" "stage" "time" "tools" "rail"}
+  .props{grid-area:tools;border:0}
+  .tools{border:0}
+  .app:not(.show-props) .props{display:none}
+  .app.show-props .tools{display:none}
+  .rail{flex-direction:row;gap:2px;padding:4px 6px;border-inline-end:0;border-top:1px solid var(--line);overflow-x:auto}
+  .rail button{flex:1 0 54px;padding:7px 2px 6px;font-size:10.5px}
+  .rail .only-m{display:grid}
+  .top{padding-inline:12px;gap:8px}
+  .brand small,.hide-m{display:none}
+  .top select{max-width:150px;font-size:12.5px;padding:6px 8px}
+  .ibtn{width:34px;height:34px}
+  .time{padding:6px 12px 8px}
+  .tracks{display:none}
+  .grid2{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .fonts{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+}
+@media (max-width: 440px){ #exportBtn span{display:none} #exportBtn{padding:8px 10px} .brand b{font-size:20px} }
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6e3a1"/><stop offset=".55" stop-color="#c99a3d"/><stop offset="1" stop-color="#8c6421"/></linearGradient></defs>
+        <g fill="none" stroke="url(#lg)" stroke-width="1.8"><rect x="7" y="7" width="18" height="18"/><rect x="7" y="7" width="18" height="18" transform="rotate(45 16 16)"/></g><circle cx="16" cy="16" r="3" fill="url(#lg)"/></svg>
+      <b>لمسة</b><small>استوديو الصور والفيديو</small>
+    </div>
+    <select id="sizeSel" aria-label="مقاس التصميم"></select>
+    <button class="ibtn" id="undoBtn" title="تراجع (Ctrl+Z)" aria-label="تراجع"></button>
+    <button class="ibtn" id="redoBtn" title="إعادة (Ctrl+Y)" aria-label="إعادة"></button>
+    <button class="btn gold" id="exportBtn"></button>
+  </header>
+
+  <nav class="rail" id="rail" aria-label="الأدوات"></nav>
+  <aside class="panel tools" id="tools" aria-label="لوحة الأدوات"></aside>
+
+  <main class="stage" id="stage">
+    <canvas id="cv" width="1080" height="1080" aria-label="مساحة التصميم"></canvas>
+    <span class="zoomtag" id="zoomTag"></span>
+  </main>
+
+  <section class="time" aria-label="الخط الزمني">
+    <div class="tbar">
+      <button class="play" id="playBtn" aria-label="تشغيل المعاينة"></button>
+      <span class="tc" id="tcur">0:00.0</span>
+      <input type="range" id="scrub" min="0" max="6" step="0.01" value="0" aria-label="الوقت">
+      <span class="tc" id="tdur">0:06.0</span>
+      <label class="hide-m" for="durIn">المدة (ث)<input type="number" id="durIn" min="1" max="600" step="0.5" value="6"></label>
+    </div>
+    <div class="tracks" id="tracks"></div>
+  </section>
+
+  <aside class="panel props" id="props" aria-label="خصائص العنصر"></aside>
+</div>
+
+<div class="modal" id="exportModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="exTitle">
+    <header><h2 id="exTitle">تصدير التصميم</h2><button class="ibtn sm" id="exClose" aria-label="إغلاق"></button></header>
+    <div id="exChoose" class="exgrid">
+      <div class="ctl"><label><span>دقة الصورة</span></label><div class="seg" id="exScale"></div></div>
+      <button class="exopt" data-fmt="png"><span><b>صورة PNG</b><small>أعلى جودة، مناسبة للطباعة والشعارات</small></span></button>
+      <button class="exopt" data-fmt="jpg"><span><b>صورة JPG</b><small>حجم أصغر للنشر السريع</small></span></button>
+      <button class="exopt" data-fmt="video"><span><b id="exVidName">فيديو</b><small id="exVidSub"></small></span></button>
+      <p class="hint" id="exNote"></p>
+    </div>
+    <div id="exProg" class="exgrid" hidden>
+      <p class="hint" id="exProgTxt">جارِ تسجيل الفيديو… ابقَ في هذه الصفحة حتى ينتهي.</p>
+      <div class="progress"><i id="exBar"></i></div>
+      <button class="btn" id="exCancel">إلغاء التصدير</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" data-hide role="status" aria-live="polite"></div>
+<div class="pool" id="pool" aria-hidden="true"></div>
+<input type="file" id="fileIn" hidden>
+
+<script>
+'use strict';
+document.documentElement.lang = 'ar';
+document.documentElement.dir = 'rtl';
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const DEG = Math.PI / 180;
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const uid = () => Math.random().toString(36).slice(2, 10);
+const easeOut = p => 1 - Math.pow(1 - p, 3);
+const backOut = p => { const c = 1.9; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+const isAr = s => /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/.test(s || '');
+const fmtT = t => `\u2066${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}\u2069`;
+const dim = (w, hh) => `\u2066${w}×${hh}\u2069`;
+const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+function merge(t, ...ss) { for (const s of ss) for (const k in s) { if (isObj(s[k]) && isObj(t[k])) merge(t[k], s[k]); else t[k] = isObj(s[k]) ? merge({}, s[k]) : s[k]; } return t; }
+function hexA(hex, a = 1) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function once(el, ev) { return new Promise((res, rej) => { el.addEventListener(ev, res, { once: true }); el.addEventListener('error', () => rej(new Error('load')), { once: true }); }); }
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag); let val;
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'value') val = v;
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat(Infinity)) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
+  if (val !== undefined) el.value = val;
+  return el;
+}
+const ICONS = {
+  templates: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  text: '<path d="M5 7V5h14v2M12 5v14M9 19h6"/>',
+  media: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+  shapes: '<circle cx="8.5" cy="8.5" r="5"/><rect x="11" y="11" width="10" height="10" rx="1.5"/>',
+  bg: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 5.9 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>',
+  layers: '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/>',
+  props: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+  undo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>',
+  redo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  download: '<path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/>',
+  play: '<path d="M8 5.5v13l11-6.5-11-6.5Z" fill="currentColor"/>',
+  pause: '<rect x="6.5" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1" fill="currentColor"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  up: '<path d="m6 15 6-6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff: '<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3 3.8M6.3 6.3A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.7-1.8"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
+  video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/>',
+  music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
+  film: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 8h4M3 16h4M17 8h4M17 16h4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  shape: '<path d="m12 3 2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7L12 3Z"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+  flipx: '<path d="M12 3v18M9 7 4 12l5 5V7ZM15 7l5 5-5 5V7Z"/>',
+  flipy: '<path d="M3 12h18M7 9l5-5 5 5H7ZM7 15l5 5 5-5H7Z"/>',
+  front: '<rect x="8" y="8" width="12" height="12" rx="2" fill="currentColor" fill-opacity=".25"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>',
+  back: '<rect x="4" y="4" width="12" height="12" rx="2"/><path d="M20 8v11a1 1 0 0 1-1 1H8"/>',
+};
+const icon = n => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('class', 'i'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[n] || ''; return s; };
+
+/* ---------- design data ---------- */
+const FONTS = [
+  ['Amiri', 'أميري'], ['Aref Ruqaa', 'رقعة عارف'], ['Reem Kufi', 'ريم كوفي'], ['Cairo', 'القاهرة'],
+  ['Tajawal', 'تجوال'], ['El Messiri', 'المسيري'], ['Lalezar', 'لاله‌زار'], ['Changa', 'تشانجا'],
+  ['Marhey', 'مرحى'], ['Noto Kufi Arabic', 'نوتو كوفي'], ['Scheherazade New', 'شهرزاد'], ['Playfair Display', 'Playfair'],
+];
+const METALS = {
+  gold: ['#b88a36', '#f0d78f', '#fff3c9', '#d4a84c', '#a87d2e'],
+  silver: ['#8d9196', '#dde1e6', '#ffffff', '#b2b7bd', '#878b91'],
+  rose: ['#a8645a', '#ebbba8', '#fde3d6', '#cf8c78', '#a35d52'],
+};
+const SWATCHES = ['#ffffff', '#f2e6c9', '#d4b06a', '#9b7428', '#141116', '#0d2b24', '#5a1023', '#0f1f3d', '#4cc9ff', '#e85d4a'];
+const GRADS = [
+  ['زمردي', '#0e2c25', '#03110d'], ['عنابي', '#2a0b14', '#0b0507'], ['كحلي', '#101a38', '#05070f'], ['فحمي', '#211b16', '#000000'],
+  ['بنفسجي ملكي', '#29123a', '#0a0410'], ['فيروزي', '#123540', '#041216'], ['ذهبي داكن', '#3a2a14', '#0e0a05'], ['عاجي', '#f7f1e6', '#e6d6b8'],
+  ['وردي هادئ', '#f6e4e1', '#d9b2ad'], ['سماوي', '#dfeaf3', '#a9c3d8'],
+];
+const SIZES = [
+  [1080, 1080, 'منشور مربع'], [1080, 1350, 'منشور عمودي'], [1080, 1920, 'ستوري وريلز'], [1920, 1080, 'فيديو يوتيوب'],
+  [1280, 720, 'صورة مصغّرة'], [1640, 624, 'غلاف فيسبوك'], [1500, 500, 'غلاف X'], [2480, 3508, 'A4 للطباعة'],
+];
+const F0 = { bright: 100, contrast: 100, sat: 100, blur: 0, hue: 0, gray: 0, sepia: 0 };
+const FILTERS = [
+  ['أصلي', {}], ['دافئ', { sepia: 25, sat: 115, bright: 103 }], ['بارد', { sat: 85, hue: 12, contrast: 105 }],
+  ['أبيض وأسود', { gray: 100, contrast: 115 }], ['كلاسيكي', { sepia: 60, contrast: 95, bright: 105 }],
+  ['درامي', { contrast: 140, sat: 80, bright: 92 }], ['حيوي', { sat: 145, contrast: 110 }], ['حالم', { bright: 110, contrast: 85, sat: 110, blur: 1 }],
+];
+const IN_ANIMS = [['none', 'بدون'], ['fade', 'ظهور'], ['up', 'صعود'], ['down', 'نزول'], ['right', 'من اليمين'], ['left', 'من اليسار'], ['zoom', 'تكبير'], ['pop', 'قفزة'], ['blur', 'من الضباب'], ['spin', 'دوران'], ['type', 'آلة كاتبة']];
+const OUT_ANIMS = [['none', 'بدون'], ['fade', 'اختفاء'], ['zoom', 'تصغير'], ['down', 'هبوط'], ['blur', 'إلى الضباب']];
+const LOOPS = [['none', 'بدون'], ['pulse', 'نبض'], ['float', 'طفو'], ['kenburns', 'زووم سينمائي'], ['sway', 'تمايل']];
+const SHAPES = [['rect', 'مستطيل'], ['ellipse', 'دائرة'], ['triangle', 'مثلث'], ['star', 'نجمة'], ['star8', 'نجمة ثمانية'], ['hexagon', 'سداسي'], ['diamond', 'معيّن'], ['arch', 'قوس محراب'], ['line', 'خط']];
+const SHAPE_NAMES = Object.fromEntries(SHAPES);
+const TYPE_NAMES = { text: 'نص', image: 'صورة', video: 'فيديو', shape: 'شكل' };
+
+const defaultBg = () => ({ type: 'gradient', c1: '#0e2c25', c2: '#03110d', angle: 160, mediaId: null, blur: 0, dim: 0, vignette: 40, grain: 10 });
+const newDoc = (w, h, bg) => ({ w, h, duration: 6, bg: merge(defaultBg(), bg || {}), layers: [], audio: null });
+function baseLayer(D, type) {
+  return { id: uid(), type, x: D.w / 2, y: D.h / 2, w: 200, h: 100, rot: 0, opacity: 1, hidden: false, locked: false, flipX: false, flipY: false,
+    shadow: { on: false, color: '#000000', alpha: .45, blur: 30, x: 0, y: 12 },
+    anim: { in: 'fade', out: 'none', loop: 'none', dur: .8, start: 0, end: null } };
+}
+const mkText = (D, o) => merge(baseLayer(D, 'text'), {
+  text: 'نص جديد', font: 'Cairo', weight: 700, size: 80, lineH: 1.35, align: 'center',
+  fill: { type: 'solid', c1: '#ffffff', c2: '#d4b06a', angle: 90 }, stroke: { on: false, color: '#000000', w: 6 },
+  box: { on: false, color: '#000000', alpha: .5, pad: 24, radius: 16 } }, o || {});
+const mkShape = (D, o) => merge(baseLayer(D, 'shape'), {
+  shape: 'rect', w: 320, h: 320, radius: 0, fillOn: true, fill: { type: 'solid', c1: '#d4b06a', c2: '#8c6421', angle: 90 },
+  stroke: { on: false, w: 6, fill: { type: 'gold', c1: '#d4b06a', c2: '#ffffff', angle: 90 } } }, o || {});
+const mkMedia = (D, type, m, o) => merge(baseLayer(D, type), {
+  mediaId: m.id, w: m.w, h: m.h, mask: 'none', radius: 0, fx: 50, fy: 50, border: { on: false, w: 8, color: '#d4b06a' },
+  f: { ...F0 }, trim: 0, volume: 1, muted: false }, o || {});
+
+/* ---------- templates ---------- */
+const gold = { type: 'gold' };
+const TEMPLATES = [
+  { name: 'آية مذهّبة', make() {
+    const D = newDoc(1080, 1350, { c1: '#0e2c25', c2: '#03110d', vignette: 55, grain: 12 });
+    D.layers = [
+      mkShape(D, { w: 950, h: 1240, fillOn: false, stroke: { on: true, w: 3, fill: gold }, anim: { dur: 1.4 } }),
+      mkShape(D, { w: 912, h: 1202, fillOn: false, opacity: .45, stroke: { on: true, w: 1.5, fill: gold }, anim: { dur: 1.6 } }),
+      mkShape(D, { shape: 'star8', y: 330, w: 92, h: 92, fill: gold, anim: { in: 'spin', dur: 1.2, loop: 'sway' } }),
+      mkText(D, { text: 'وَقُل رَّبِّ زِدْنِي عِلْمًا', font: 'Amiri', size: 116, y: 630, fill: gold, shadow: { on: true, alpha: .55, blur: 28, y: 10 }, anim: { in: 'up', dur: 1.1, start: .3 } }),
+      mkShape(D, { shape: 'line', y: 770, w: 240, h: 3, fill: gold, anim: { in: 'zoom', start: .8 } }),
+      mkText(D, { text: 'سورة طه · الآية ١١٤', font: 'Reem Kufi', weight: 400, size: 40, y: 840, fill: { c1: '#e9dcbc' }, opacity: .85, anim: { start: 1 } }),
+      mkShape(D, { shape: 'star8', y: 1065, w: 34, h: 34, fill: gold, opacity: .8, anim: { start: 1.3 } }),
+    ];
+    return D; } },
+  { name: 'عرض خاص', make() {
+    const D = newDoc(1080, 1080, { c1: '#2a0b14', c2: '#0b0507', angle: 150, vignette: 50 });
+    D.layers = [
+      mkShape(D, { shape: 'ellipse', w: 860, h: 860, fillOn: false, opacity: .3, stroke: { on: true, w: 2, fill: gold }, anim: { dur: 1.5, loop: 'pulse' } }),
+      mkShape(D, { shape: 'ellipse', w: 740, h: 740, fillOn: false, opacity: .16, stroke: { on: true, w: 1.5, fill: gold }, anim: { dur: 1.8 } }),
+      mkText(D, { text: 'عرض حصري لفترة محدودة', font: 'Reem Kufi', weight: 400, size: 44, y: 300, fill: { c1: '#ead9b5' }, anim: { in: 'down' } }),
+      mkText(D, { text: 'خصم ٥٠٪', font: 'Lalezar', weight: 400, size: 230, y: 510, fill: gold, shadow: { on: true, alpha: .6, blur: 40, y: 14 }, anim: { in: 'pop', start: .3, dur: .9 } }),
+      mkText(D, { text: 'على جميع العطور الشرقية', font: 'Tajawal', weight: 500, size: 54, y: 690, fill: { c1: '#f4ece0' }, anim: { start: .8 } }),
+      mkText(D, { text: 'اطلب الآن', font: 'Cairo', weight: 700, size: 46, y: 840, fill: { c1: '#1f0a10' }, box: { on: true, color: '#d4b06a', alpha: 1, pad: 26, radius: 60 }, anim: { in: 'up', start: 1.1, loop: 'pulse' } }),
+    ];
+    return D; } },
+  { name: 'ستوري جمعة', make() {
+    const D = newDoc(1080, 1920, { c1: '#101a38', c2: '#05070f', vignette: 60, grain: 12 });
+    D.layers = [
+      mkShape(D, { shape: 'arch', y: 930, w: 720, h: 1150, fill: { c1: '#ffffff' }, opacity: .04, anim: { dur: 1.6 } }),
+      mkShape(D, { shape: 'arch', y: 930, w: 780, h: 1210, fillOn: false, stroke: { on: true, w: 4, fill: gold }, anim: { dur: 1.4 } }),
+      mkShape(D, { shape: 'star8', y: 560, w: 110, h: 110, fill: gold, anim: { in: 'spin', dur: 1.2, loop: 'sway' } }),
+      mkText(D, { text: 'جمعة مباركة', font: 'Aref Ruqaa', size: 190, y: 900, fill: gold, shadow: { on: true, alpha: .6, blur: 36, y: 12 }, anim: { in: 'zoom', start: .3, dur: 1.1, loop: 'float' } }),
+      mkText(D, { text: 'اللّٰهمّ صلِّ وسلّم على نبيّنا محمد', font: 'Amiri', weight: 400, size: 56, y: 1120, fill: { c1: '#efe6d2' }, anim: { in: 'up', start: .9 } }),
+      mkText(D, { text: 'شاركها مع من تحب', font: 'Tajawal', weight: 400, size: 38, y: 1640, fill: { c1: '#efe6d2' }, opacity: .7, anim: { start: 1.4 } }),
+    ];
+    return D; } },
+  { name: 'صورة مصغّرة', make() {
+    const D = newDoc(1280, 720, { c1: '#1c1c1f', c2: '#060607', angle: 120, vignette: 35, grain: 8 });
+    D.layers = [
+      mkShape(D, { shape: 'diamond', x: 150, y: 140, w: 70, h: 70, fill: { c1: '#f5c518' }, opacity: .9, anim: { in: 'spin' } }),
+      mkShape(D, { shape: 'diamond', x: 1140, y: 590, w: 46, h: 46, fill: { c1: '#f5c518' }, opacity: .6, anim: { in: 'spin', start: .3 } }),
+      mkText(D, { text: 'ابدأ مشروعك', font: 'Cairo', weight: 900, size: 132, y: 280, stroke: { on: true, color: '#000000', w: 10 }, shadow: { on: true, alpha: .6, blur: 20, y: 10 }, anim: { in: 'right' } }),
+      mkText(D, { text: 'في ٧ أيام فقط', font: 'Cairo', weight: 900, size: 92, y: 460, rot: -3, fill: { c1: '#111111' }, box: { on: true, color: '#f5c518', alpha: 1, pad: 22, radius: 10 }, anim: { in: 'pop', start: .4 } }),
+    ];
+    return D; } },
+  { name: 'مقدمة متحركة', make() {
+    const D = newDoc(1920, 1080, { c1: '#1d150e', c2: '#000000', angle: 180, vignette: 60, grain: 18 });
+    D.duration = 5;
+    D.layers = [
+      mkShape(D, { shape: 'star8', y: 250, w: 80, h: 80, fill: gold, anim: { in: 'spin', dur: 1.2, loop: 'sway', out: 'fade' } }),
+      mkText(D, { text: 'لمسة', font: 'Reem Kufi', size: 280, y: 470, fill: gold, shadow: { on: true, color: '#d4b06a', alpha: .35, blur: 60, y: 0 }, anim: { in: 'pop', start: .4, dur: 1, loop: 'pulse', out: 'fade' } }),
+      mkShape(D, { shape: 'line', y: 640, w: 560, h: 3, fill: gold, anim: { in: 'zoom', start: .9, dur: 1, out: 'fade' } }),
+      mkText(D, { text: 'نصمّم بإتقان', font: 'El Messiri', weight: 400, size: 70, y: 740, fill: { c1: '#efe4cf' }, anim: { in: 'up', start: 1.3, out: 'fade' } }),
+    ];
+    return D; } },
+  { name: 'بطاقة دعوة', make() {
+    const D = newDoc(1080, 1350, { c1: '#f7f1e6', c2: '#e6d6b8', vignette: 15, grain: 8 });
+    const brown = { c1: '#6b5226' };
+    D.layers = [
+      mkShape(D, { w: 960, h: 1230, fillOn: false, stroke: { on: true, w: 2.5, fill: gold } }),
+      mkShape(D, { w: 925, h: 1195, fillOn: false, opacity: .5, stroke: { on: true, w: 1, fill: gold } }),
+      mkShape(D, { shape: 'star8', y: 270, w: 72, h: 72, fill: gold, anim: { in: 'spin' } }),
+      mkText(D, { text: 'يسعدنا حضوركم', font: 'El Messiri', weight: 400, size: 54, y: 410, fill: brown, anim: { start: .3 } }),
+      mkText(D, { text: 'حفل الافتتاح', font: 'Aref Ruqaa', size: 150, y: 590, fill: gold, anim: { in: 'zoom', start: .5 } }),
+      mkShape(D, { shape: 'line', y: 720, w: 200, h: 2, fill: gold, anim: { in: 'zoom', start: .8 } }),
+      mkText(D, { text: 'الخميس ٥ نوفمبر · الساعة ٨ مساءً', font: 'Tajawal', weight: 500, size: 44, y: 810, fill: { c1: '#3a2c14' }, anim: { in: 'up', start: 1 } }),
+      mkText(D, { text: 'قاعة اللؤلؤة', font: 'Tajawal', weight: 400, size: 40, y: 890, fill: brown, anim: { in: 'up', start: 1.2 } }),
+    ];
+    return D; } },
+];
+const TEXT_STYLES = [
+  { n: 'ذهبي ملكي', css: 'font-family:Amiri;font-weight:700;background:linear-gradient(#e9cf86,#fff3c9 45%,#c99a3d 70%,#8c6421);-webkit-background-clip:text;background-clip:text;color:transparent', o: { text: 'الفخامة في التفاصيل', font: 'Amiri', size: 110, fill: gold, shadow: { on: true, alpha: .5, blur: 24, y: 8 } } },
+  { n: 'كوفي حديث', css: 'font-family:"Reem Kufi";font-weight:700', o: { text: 'عنوان عصري', font: 'Reem Kufi', size: 100 } },
+  { n: 'رقعة', css: 'font-family:"Aref Ruqaa";font-weight:700;color:#f2e6c9', o: { text: 'بكل حب', font: 'Aref Ruqaa', size: 120, fill: { c1: '#f2e6c9' } } },
+  { n: 'إعلان جريء', css: 'font-family:Lalezar;-webkit-text-stroke:1.5px #000;paint-order:stroke fill', o: { text: 'عرض اليوم', font: 'Lalezar', weight: 400, size: 150, stroke: { on: true, color: '#000000', w: 8 } } },
+  { n: 'شريط عنوان', css: 'font-family:Cairo;font-weight:700;font-size:17px;color:#1a1408;background:#d4b06a;padding:6px 14px;border-radius:40px', o: { text: 'اطلب الآن', font: 'Cairo', size: 60, fill: { c1: '#1a1408' }, box: { on: true, color: '#d4b06a', alpha: 1, pad: 28, radius: 999 } } },
+  { n: 'توهّج نيون', css: 'font-family:Changa;font-weight:800;text-shadow:0 0 10px #4cc9ff,0 0 22px #4cc9ff', o: { text: 'سهرة الليلة', font: 'Changa', weight: 800, size: 110, shadow: { on: true, color: '#4cc9ff', alpha: 1, blur: 40, x: 0, y: 0 } } },
+  { n: 'فضّي', css: 'font-family:"El Messiri";font-weight:700;background:linear-gradient(#d9dde2,#fff 45%,#a9aeb4 70%,#6c7076);-webkit-background-clip:text;background-clip:text;color:transparent', o: { text: 'إصدار خاص', font: 'El Messiri', size: 110, fill: { type: 'silver' } } },
+  { n: 'ترجمة فيديو', css: 'font-family:Tajawal;font-weight:700;font-size:16px;background:rgb(0 0 0 / .65);padding:4px 10px;border-radius:8px', o: { text: 'اكتب الترجمة هنا', font: 'Tajawal', size: 54, box: { on: true, color: '#000000', alpha: .55, pad: 18, radius: 12 }, anim: { in: 'type', dur: 1.2 } } },
+];
+
+/* ---------- state ---------- */
+let S = newDoc(1080, 1080);
+const media = new Map();
+let sel = null, T = 0, playing = false, exporting = false, animPreview = false;
+let tab = 'templates', guides = [], RS = 1;
+let hist = [], hi = -1, booted = false;
+const cv = $('#cv'), ctx = cv.getContext('2d');
+const mq = matchMedia('(max-width: 959px)');
+const cur = () => S.layers.find(l => l.id === sel) || null;
+const layerEnd = (l, D = S) => Math.min(l.anim.end ?? D.duration, D.duration);
+
+/* ---------- drawing ---------- */
+function rr(p, x, y, w, hh, r) {
+  r = Math.max(0, Math.min(r || 0, w / 2, hh / 2));
+  p.moveTo(x + r, y); p.arcTo(x + w, y, x + w, y + hh, r); p.arcTo(x + w, y + hh, x, y + hh, r);
+  p.arcTo(x, y + hh, x, y, r); p.arcTo(x, y, x + w, y, r); p.closePath(); return p;
+}
+function poly(p, n, w, hh, inner) {
+  const pts = inner === 1 ? n : n * 2;
+  for (let i = 0; i < pts; i++) {
+    const a = -Math.PI / 2 + i * Math.PI * 2 / pts, r = (inner === 1 || i % 2 === 0) ? 1 : inner;
+    const X = Math.cos(a) * w / 2 * r, Y = Math.sin(a) * hh / 2 * r;
+    i ? p.lineTo(X, Y) : p.moveTo(X, Y);
+  }
+  p.closePath();
+}
+function shapePath(kind, w, hh, r) {
+  const p = new Path2D(), x = -w / 2, y = -hh / 2;
+  switch (kind) {
+    case 'ellipse': p.ellipse(0, 0, w / 2, hh / 2, 0, 0, Math.PI * 2); break;
+    case 'triangle': p.moveTo(0, y); p.lineTo(w / 2, hh / 2); p.lineTo(x, hh / 2); p.closePath(); break;
+    case 'star': poly(p, 5, w, hh, .45); break;
+    case 'star8': poly(p, 8, w, hh, .76); break;
+    case 'hexagon': poly(p, 6, w, hh, 1); break;
+    case 'diamond': p.moveTo(0, y); p.lineTo(w / 2, 0); p.lineTo(0, hh / 2); p.lineTo(x, 0); p.closePath(); break;
+    case 'arch': { const s = Math.min(w * .62, hh * .6);
+      p.moveTo(x, hh / 2); p.lineTo(x, y + s); p.bezierCurveTo(x, y + s * .45, -w * .2, y + s * .12, 0, y);
+      p.bezierCurveTo(w * .2, y + s * .12, w / 2, y + s * .45, w / 2, y + s); p.lineTo(w / 2, hh / 2); p.closePath(); break; }
+    default: rr(p, x, y, w, hh, r);
+  }
+  return p;
+}
+function makeFill(c, f, w, hh) {
+  if (!f || f.type === 'solid') return f ? f.c1 : '#ffffff';
+  const a = (f.type === 'gradient' ? f.angle : 90) * DEG, dx = Math.cos(a) * w / 2, dy = Math.sin(a) * hh / 2;
+  const g = c.createLinearGradient(-dx, -dy, dx, dy);
+  if (f.type === 'gradient') { g.addColorStop(0, f.c1); g.addColorStop(1, f.c2); }
+  else { const s = METALS[f.type] || METALS.gold; s.forEach((col, i) => g.addColorStop(i / (s.length - 1), col)); }
+  return g;
+}
+function filterStr(f, eb = 0) {
+  const p = [];
+  if (f) {
+    if (f.bright !== 100) p.push(`brightness(${f.bright}%)`);
+    if (f.contrast !== 100) p.push(`contrast(${f.contrast}%)`);
+    if (f.sat !== 100) p.push(`saturate(${f.sat}%)`);
+    if (f.gray) p.push(`grayscale(${f.gray}%)`);
+    if (f.sepia) p.push(`sepia(${f.sepia}%)`);
+    if (f.hue) p.push(`hue-rotate(${f.hue}deg)`);
+  }
+  const b = ((f && f.blur) || 0) + eb;
+  if (b > .05) p.push(`blur(${(b * RS).toFixed(2)}px)`);
+  return p.length ? p.join(' ') : 'none';
+}
+const fontStr = l => `${l.weight} ${l.size}px "${l.font}", "Noto Kufi Arabic", sans-serif`;
+function measure(c, l) {
+  c.save(); c.font = fontStr(l);
+  const lines = String(l.text || ' ').split('\n');
+  const ws = lines.map(s => c.measureText(s || ' ').width);
+  c.restore();
+  const lh = l.size * l.lineH, tw = Math.max(...ws), th = lh * lines.length;
+  const pad = l.box.on ? l.box.pad : Math.max(6, l.size * .08);
+  l.w = tw + pad * 2; l.h = th + pad * 2;
+  return { lines, lh, tw, th };
+}
+function animState(l, t, D) {
+  const a = l.anim, st = a.start, en = layerEnd(l, D);
+  if (t < st || t > en) return null;
+  const d = Math.max(.05, a.dur), pi = clamp((t - st) / d), po = clamp((en - t) / d);
+  const ei = easeOut(pi), eo = easeOut(po), M = Math.min(D.w, D.h) * .12;
+  const r = { alpha: 1, dx: 0, dy: 0, sc: 1, rot: 0, type: 1, blur: 0 };
+  switch (a.in) {
+    case 'fade': r.alpha *= ei; break;
+    case 'up': r.alpha *= ei; r.dy += (1 - ei) * M; break;
+    case 'down': r.alpha *= ei; r.dy -= (1 - ei) * M; break;
+    case 'right': r.alpha *= ei; r.dx += (1 - ei) * M * 1.5; break;
+    case 'left': r.alpha *= ei; r.dx -= (1 - ei) * M * 1.5; break;
+    case 'zoom': r.alpha *= ei; r.sc *= .5 + .5 * ei; break;
+    case 'pop': r.alpha *= clamp(pi * 3); r.sc *= Math.max(.01, backOut(pi)); break;
+    case 'blur': r.alpha *= ei; r.blur += (1 - ei) * 24; break;
+    case 'spin': r.alpha *= ei; r.rot -= (1 - ei) * Math.PI; r.sc *= .4 + .6 * ei; break;
+    case 'type': r.type = l.type === 'text' ? pi : 1; if (l.type !== 'text') r.alpha *= ei; break;
+  }
+  switch (a.out) {
+    case 'fade': r.alpha *= eo; break;
+    case 'zoom': r.alpha *= eo; r.sc *= .5 + .5 * eo; break;
+    case 'down': r.alpha *= eo; r.dy += (1 - eo) * M; break;
+    case 'blur': r.alpha *= eo; r.blur += (1 - eo) * 24; break;
+  }
+  const life = t - st;
+  switch (a.loop) {
+    case 'pulse': r.sc *= 1 + .035 * Math.sin(life * Math.PI * 1.4); break;
+    case 'float': r.dy += Math.sin(life * 1.8) * M * .1; break;
+    case 'kenburns': r.sc *= 1 + .14 * (life / Math.max(.1, en - st)); break;
+    case 'sway': r.rot += Math.sin(life * 1.6) * .06; break;
+  }
+  return r;
+}
+const FULL = { alpha: 1, dx: 0, dy: 0, sc: 1, rot: 0, type: 1, blur: 0 };
+function applyShadow(c, l) {
+  const s = l.shadow; if (!s || !s.on) return;
+  c.shadowColor = hexA(s.color, s.alpha); c.shadowBlur = s.blur * RS; c.shadowOffsetX = s.x * RS; c.shadowOffsetY = s.y * RS;
+}
+const noShadow = c => { c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetX = 0; c.shadowOffsetY = 0; };
+function drawText(c, l, st) {
+  const m = measure(c, l);
+  if (l.box.on) { c.fillStyle = hexA(l.box.color, l.box.alpha); c.fill(rr(new Path2D(), -l.w / 2, -l.h / 2, l.w, l.h, l.box.radius)); noShadow(c); }
+  c.font = fontStr(l); c.textBaseline = 'middle'; c.textAlign = l.align; c.direction = isAr(l.text) ? 'rtl' : 'ltr'; c.lineJoin = 'round';
+  c.filter = filterStr(null, st.blur);
+  const x = l.align === 'left' ? -m.tw / 2 : l.align === 'right' ? m.tw / 2 : 0;
+  let budget = st.type < 1 ? Math.round(String(l.text).length * st.type) : Infinity;
+  c.fillStyle = makeFill(c, l.fill, m.tw, m.th);
+  m.lines.forEach((s, i) => {
+    const y = -m.th / 2 + m.lh * (i + .5);
+    let seg = s;
+    if (budget !== Infinity) { seg = s.slice(0, Math.max(0, budget)); budget -= s.length + 1; }
+    if (!seg) return;
+    if (l.stroke.on && l.stroke.w > 0) { c.strokeStyle = l.stroke.color; c.lineWidth = l.stroke.w * 2; c.strokeText(seg, x, y); }
+    c.fillText(seg, x, y);
+  });
+}
+function maskPath(l) {
+  if (l.mask === 'circle') return shapePath('ellipse', l.w, l.h);
+  if (l.mask === 'arch') return shapePath('arch', l.w, l.h);
+  return shapePath('rect', l.w, l.h, l.radius);
+}
+function drawMedia(c, l, st) {
+  const m = media.get(l.mediaId); if (!m) return;
+  const el = m.el, path = maskPath(l);
+  if (l.type === 'video' && el.readyState < 2) { c.fillStyle = 'rgba(255,255,255,.06)'; c.fill(path); return; }
+  if (l.shadow.on) { c.fillStyle = '#000'; c.fill(path); }
+  noShadow(c);
+  c.save(); c.clip(path); c.filter = filterStr(l.f, st.blur);
+  const iw = m.w, ih = m.h, k = Math.max(l.w / iw, l.h / ih), sw = l.w / k, sh = l.h / k;
+  c.drawImage(el, (iw - sw) * l.fx / 100, (ih - sh) * l.fy / 100, sw, sh, -l.w / 2, -l.h / 2, l.w, l.h);
+  c.restore();
+  if (l.border.on && l.border.w > 0) { c.lineWidth = l.border.w; c.strokeStyle = l.border.color; c.stroke(path); }
+}
+function drawShape(c, l, st) {
+  const p = shapePath(l.shape, l.w, l.h, l.radius);
+  c.filter = filterStr(null, st.blur);
+  if (l.fillOn) { c.fillStyle = makeFill(c, l.fill, l.w, l.h); c.fill(p); noShadow(c); }
+  if (l.stroke.on && l.stroke.w > 0) { c.lineWidth = l.stroke.w; c.strokeStyle = makeFill(c, l.stroke.fill, l.w, l.h); c.stroke(p); }
+}
+function drawLayer(c, l, st) {
+  c.save();
+  c.globalAlpha = clamp(l.opacity * st.alpha);
+  c.translate(l.x + st.dx, l.y + st.dy);
+  c.rotate(l.rot * DEG + st.rot);
+  c.scale(st.sc * (l.flipX ? -1 : 1), st.sc * (l.flipY ? -1 : 1));
+  applyShadow(c, l);
+  if (l.type === 'text') drawText(c, l, st);
+  else if (l.type === 'shape') drawShape(c, l, st);
+  else drawMedia(c, l, st);
+  c.restore();
+}
+let noiseCv = null;
+function noise() {
+  if (noiseCv) return noiseCv;
+  noiseCv = document.createElement('canvas'); noiseCv.width = noiseCv.height = 160;
+  const g = noiseCv.getContext('2d'), d = g.createImageData(160, 160);
+  for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; }
+  g.putImageData(d, 0, 0); return noiseCv;
+}
+function drawBg(c, D) {
+  const b = D.bg, W = D.w, H = D.h, m = b.type === 'image' && media.get(b.mediaId);
+  if (m) {
+    c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+    c.save(); c.filter = filterStr(null, b.blur);
+    const k = Math.max(W / m.w, H / m.h), sw = W / k, sh = H / k;
+    const pad = b.blur * 2;
+    c.drawImage(m.el, (m.w - sw) / 2, (m.h - sh) / 2, sw, sh, -pad, -pad, W + pad * 2, H + pad * 2);
+    c.restore();
+  } else if (b.type === 'gradient') {
+    const a = b.angle * DEG, dx = Math.cos(a) * W / 2, dy = Math.sin(a) * H / 2;
+    const g = c.createLinearGradient(W / 2 - dx, H / 2 - dy, W / 2 + dx, H / 2 + dy);
+    g.addColorStop(0, b.c1); g.addColorStop(1, b.c2); c.fillStyle = g; c.fillRect(0, 0, W, H);
+  } else { c.fillStyle = b.c1; c.fillRect(0, 0, W, H); }
+  if (b.dim) { c.fillStyle = `rgba(0,0,0,${b.dim / 100})`; c.fillRect(0, 0, W, H); }
+  if (b.vignette) {
+    const g = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .3, W / 2, H / 2, Math.hypot(W, H) / 2);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${b.vignette / 100 * .85})`);
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+  }
+}
+function render(c, D, t, o) {
+  RS = o.scale || 1;
+  c.save(); c.setTransform(RS, 0, 0, RS, 0, 0); c.globalAlpha = 1; c.filter = 'none';
+  drawBg(c, D);
+  for (const l of D.layers) {
+    if (l.hidden) continue;
+    const st = o.anim ? animState(l, t, D) : FULL;
+    if (st && st.alpha > .001) drawLayer(c, l, st);
+  }
+  if (D.bg.grain) {
+    c.save(); c.globalAlpha = D.bg.grain / 100 * .45; c.globalCompositeOperation = 'overlay';
+    c.fillStyle = c.createPattern(noise(), 'repeat'); c.fillRect(0, 0, D.w, D.h); c.restore();
+  }
+  if (o.selection) drawSelection(c);
+  c.restore();
+}
+
+/* ---------- selection overlay & hit testing ---------- */
+const pxk = () => S.w / (cv.getBoundingClientRect().width || S.w);
+const coarse = matchMedia('(pointer: coarse)').matches;
+function handlesFor(l) {
+  const k = pxk(), w = l.w / 2, hh = l.h / 2, out = [];
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) out.push({ k: 'c', sx, sy, x: sx * w, y: sy * hh });
+  if (l.type !== 'text' && l.w / k > 70 && l.h / k > 70 || l.type === 'shape' && l.shape === 'line') {
+    for (const [sx, sy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      if (l.type === 'shape' && l.shape === 'line' && sy) continue;
+      out.push({ k: 'e', sx, sy, x: sx * w, y: sy * hh });
+    }
+  }
+  out.push({ k: 'r', x: 0, y: -hh - 34 * k });
+  return out;
+}
+function drawSelection(c) {
+  const l = cur(); if (!l || l.hidden) return;
+  if (l.type === 'text') measure(c, l);
+  const k = pxk();
+  c.save(); c.translate(l.x, l.y); c.rotate(l.rot * DEG);
+  c.strokeStyle = '#d4b06a'; c.lineWidth = 1.5 * k; c.setLineDash([6 * k, 4 * k]);
+  c.strokeRect(-l.w / 2, -l.h / 2, l.w, l.h); c.setLineDash([]);
+  if (!l.locked) {
+    const hs = handlesFor(l);
+    c.beginPath(); c.moveTo(0, -l.h / 2); c.lineTo(0, -l.h / 2 - 34 * k); c.stroke();
+    for (const p of hs) {
+      c.fillStyle = '#ffffff'; c.lineWidth = 1.5 * k; c.strokeStyle = '#b8862b';
+      c.beginPath();
+      if (p.k === 'r') c.arc(p.x, p.y, 8 * k, 0, Math.PI * 2);
+      else if (p.k === 'e') { const ww = (p.sy ? 18 : 7) * k, hh = (p.sy ? 7 : 18) * k; c.roundRect ? c.roundRect(p.x - ww / 2, p.y - hh / 2, ww, hh, 3 * k) : c.rect(p.x - ww / 2, p.y - hh / 2, ww, hh); }
+      else c.rect(p.x - 6 * k, p.y - 6 * k, 12 * k, 12 * k);
+      c.fill(); c.stroke();
+    }
+  }
+  c.restore();
+  if (guides.length) {
+    c.save(); c.strokeStyle = '#ff5fa2'; c.lineWidth = 1.2 * k; c.setLineDash([5 * k, 4 * k]);
+    for (const g of guides) { c.beginPath(); if (g.v != null) { c.moveTo(g.v, 0); c.lineTo(g.v, S.h); } else { c.moveTo(0, g.hz); c.lineTo(S.w, g.hz); } c.stroke(); }
+    c.restore();
+  }
+}
+function toLocal(l, p) {
+  const dx = p.x - l.x, dy = p.y - l.y, r = -l.rot * DEG;
+  return { x: dx * Math.cos(r) - dy * Math.sin(r), y: dx * Math.sin(r) + dy * Math.cos(r) };
+}
+function hitHandle(l, p) {
+  const lp = toLocal(l, p), R = (coarse ? 22 : 12) * pxk();
+  let best = null, bd = R;
+  for (const hd of handlesFor(l)) { const d = Math.hypot(lp.x - hd.x, lp.y - hd.y); if (d <= bd) { bd = d; best = hd; } }
+  return best;
+}
+function hitTest(p) {
+  for (let i = S.layers.length - 1; i >= 0; i--) {
+    const l = S.layers[i]; if (l.hidden) continue;
+    if (l.type === 'text') measure(ctx, l);
+    const lp = toLocal(l, p), pad = 6 * pxk();
+    if (Math.abs(lp.x) <= l.w / 2 + pad && Math.abs(lp.y) <= Math.max(l.h, 10 * pxk()) / 2 + pad) return l;
+  }
+  return null;
+}
+
+/* ---------- frame loop ---------- */
+let drawPending = false;
+function draw() {
+  if (cv.width !== S.w || cv.height !== S.h) { cv.width = S.w; cv.height = S.h; fitCanvas(); }
+  render(ctx, S, T, { anim: playing || exporting || animPreview, selection: !playing && !exporting, scale: 1 });
+}
+function requestDraw() { if (drawPending) return; drawPending = true; requestAnimationFrame(() => { drawPending = false; draw(); }); }
+function fitCanvas() {
+  const st = $('#stage'), r = st.getBoundingClientRect(), pad = mq.matches ? 14 : 36;
+  const k = Math.max(.02, Math.min((r.width - pad * 2) / S.w, (r.height - pad * 2) / S.h));
+  cv.style.width = Math.round(S.w * k) + 'px'; cv.style.height = Math.round(S.h * k) + 'px';
+  $('#zoomTag').textContent = `${dim(S.w, S.h)} · ${Math.round(k * 100)}٪`;
+  requestDraw();
+}
+new ResizeObserver(fitCanvas).observe($('#stage'));
+
+/* ---------- media & audio ---------- */
+let actx = null, adest = null;
+function route(m) {
+  if (!actx || m.kind === 'image' || m.node) return;
+  try {
+    m.node = actx.createMediaElementSource(m.el); m.gain = actx.createGain();
+    m.node.connect(m.gain); m.gain.connect(actx.destination); m.gain.connect(adest); m.el.muted = false;
+  } catch (e) { /* element already routed or unsupported */ }
+}
+function ensureAudio() {
+  try {
+    if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); adest = actx.createMediaStreamDestination(); }
+    actx.resume && actx.resume();
+    media.forEach(route);
+  } catch (e) { actx = null; }
+}
+async function makeMedia(kind, blob, name, id = uid(), restoring = false) {
+  const url = URL.createObjectURL(blob); let el, w = 0, hh = 0, dur = 0;
+  if (kind === 'image') { el = new Image(); el.src = url; await el.decode(); w = el.naturalWidth; hh = el.naturalHeight; }
+  else if (kind === 'video') {
+    el = document.createElement('video'); el.muted = true; el.playsInline = true; el.setAttribute('playsinline', ''); el.preload = 'auto'; el.src = url;
+    $('#pool').append(el); await once(el, 'loadedmetadata'); w = el.videoWidth || 1280; hh = el.videoHeight || 720; dur = isFinite(el.duration) ? el.duration : 0;
+    el.addEventListener('seeked', requestDraw); el.addEventListener('loadeddata', requestDraw);
+    try { el.currentTime = .01; } catch (e) {}
+  } else { el = new Audio(); el.preload = 'auto'; el.src = url; $('#pool').append(el); await once(el, 'loadedmetadata'); dur = isFinite(el.duration) ? el.duration : 0; }
+  const m = { id, kind, url, el, name: name || '', w, h: hh, dur, blob };
+  media.set(id, m); route(m);
+  if (!restoring) store.putMedia(m);
+  return m;
+}
+const kindOf = f => f.type.startsWith('image/') ? 'image' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : null;
+async function addFiles(files, how) {
+  for (const f of files) {
+    const kind = kindOf(f);
+    if (!kind) { toast(`الملف «${f.name}» ليس صورة أو فيديو أو صوتًا.`); continue; }
+    let m;
+    try { m = await makeMedia(kind, f, f.name); } catch (e) { toast(`تعذّر فتح «${f.name}». جرّب صيغة JPG أو PNG أو MP4.`); continue; }
+    if (kind === 'audio' || how === 'audio') setMusic(m);
+    else if (how === 'bg' && kind === 'image') { S.bg.type = 'image'; S.bg.mediaId = m.id; commit(); renderTools(); }
+    else addMediaLayer(m);
+  }
+}
+function addMediaLayer(m, o) {
+  let l;
+  if (m.kind === 'video') {
+    const k = Math.min(S.w / m.w, S.h / m.h);
+    l = mkMedia(S, 'video', m, { w: m.w * k, h: m.h * k, anim: { in: 'none' } });
+    if (m.dur > S.duration) S.duration = Math.min(600, Math.ceil(m.dur * 10) / 10);
+  } else {
+    const k = Math.min(S.w * .7 / m.w, S.h * .7 / m.h);
+    l = mkMedia(S, 'image', m, { w: m.w * k, h: m.h * k });
+  }
+  merge(l, o || {});
+  addLayer(l);
+}
+function setMusic(m) { S.audio = { mediaId: m.id, volume: .8, fade: true }; commit(); renderTools(); toast('أضيفت الموسيقى، وستظهر في الفيديو عند التصدير.'); }
+function addLayer(l, where) {
+  if (where === 'bottom') S.layers.unshift(l); else S.layers.push(l);
+  sel = l.id; animPreview = false; commit(); afterSelect(true);
+}
+async function makeSlideshow(files, per, effect) {
+  const ms = [];
+  for (const f of files) { if (kindOf(f) !== 'image') continue; try { ms.push(await makeMedia('image', f, f.name)); } catch (e) {} }
+  if (!ms.length) { toast('اختر صورًا لصنع الفيديو.'); return; }
+  const slides = ms.map((m, i) => mkMedia(S, 'image', m, { w: S.w, h: S.h,
+    anim: { in: i ? (effect === 'slide' ? 'right' : 'fade') : 'fade', dur: .7, start: i * per, end: i < ms.length - 1 ? (i + 1) * per + .7 : null, loop: effect === 'zoom' ? 'kenburns' : 'none' } }));
+  S.duration = Math.min(600, ms.length * per);
+  S.layers = [...slides, ...S.layers];
+  sel = slides[slides.length - 1].id; T = 0; animPreview = false;
+  commit(); afterSelect();
+  toast(`صُنع فيديو من ${ms.length} صور. اضغط تشغيل للمعاينة.`);
+}
+async function cloneVideoMedia(m) { return makeMedia('video', m.blob, m.name); }
+
+function syncMedia(run) {
+  for (const l of S.layers) {
+    if (l.type !== 'video') continue;
+    const m = media.get(l.mediaId); if (!m) continue;
+    const el = m.el, st = l.anim.start, en = layerEnd(l), local = l.trim + (T - st);
+    const inR = !l.hidden && T >= st && T < en && (!m.dur || local < m.dur);
+    if (m.gain) m.gain.gain.value = l.muted ? 0 : l.volume;
+    if (run && inR) {
+      if (el.paused) { try { el.currentTime = local; } catch (e) {} el.play().catch(() => {}); }
+      else if (Math.abs(el.currentTime - local) > .3) el.currentTime = local;
+    } else {
+      if (!el.paused) el.pause();
+      if (!run) { const tgt = clamp(local, 0, Math.max(0, (m.dur || 0) - .05)); if (Math.abs(el.currentTime - tgt) > .04) try { el.currentTime = tgt; } catch (e) {} }
+    }
+  }
+  const a = S.audio && media.get(S.audio.mediaId);
+  if (a) {
+    const el = a.el; let g = S.audio.volume;
+    if (S.audio.fade) g *= clamp((S.duration - T) / 1.5);
+    if (a.gain) a.gain.gain.value = g; else el.volume = clamp(g);
+    if (run && T < (a.dur || 1e9)) {
+      if (el.paused) { try { el.currentTime = T; } catch (e) {} el.play().catch(() => {}); }
+      else if (Math.abs(el.currentTime - T) > .3) el.currentTime = T;
+    } else if (!el.paused) el.pause();
+  }
+}
+
+/* ---------- playback ---------- */
+let t0 = 0, raf = 0, onPlayEnd = null;
+function play() {
+  if (playing) return;
+  ensureAudio();
+  if (T >= S.duration - .02) T = 0;
+  playing = true; animPreview = true; t0 = performance.now() - T * 1000;
+  syncMedia(true); updatePlayBtn(); loop();
+}
+function loop() {
+  if (!playing) return;
+  T = (performance.now() - t0) / 1000;
+  if (T >= S.duration) {
+    T = S.duration; syncMedia(true); draw(); updateTime();
+    const cb = onPlayEnd; onPlayEnd = null; pause(); if (cb) cb();
+    return;
+  }
+  syncMedia(true); draw(); updateTime();
+  raf = requestAnimationFrame(loop);
+}
+function pause() {
+  playing = false; cancelAnimationFrame(raf);
+  syncMedia(false); updatePlayBtn(); requestDraw();
+}
+function updatePlayBtn() { const b = $('#playBtn'); b.replaceChildren(icon(playing ? 'pause' : 'play')); b.setAttribute('aria-label', playing ? 'إيقاف مؤقت' : 'تشغيل المعاينة'); }
+function updateTime() {
+  $('#tcur').textContent = fmtT(T); $('#tdur').textContent = fmtT(S.duration);
+  const sc = $('#scrub'); sc.max = S.duration; sc.value = T;
+  const ph = $('#tracks .playhead'); if (ph) ph.style.left = (T / S.duration * 100) + '%';
+  if (document.activeElement !== $('#durIn')) $('#durIn').value = S.duration;
+}
+
+/* ---------- history & persistence ---------- */
+const snap = () => JSON.stringify({ w: S.w, h: S.h, duration: S.duration, bg: S.bg, layers: S.layers, audio: S.audio });
+function commit() {
+  const s = snap(); if (hist[hi] === s) return;
+  hist = hist.slice(0, hi + 1); hist.push(s); if (hist.length > 80) hist.shift(); hi = hist.length - 1;
+  updateUndo(); store.saveSoon(); renderTracks(); updateTime();
+}
+function loadDoc(D) {
+  const base = newDoc(D.w, D.h);
+  S = { w: D.w, h: D.h, duration: D.duration || 6, bg: merge(base.bg, D.bg || {}), audio: D.audio && media.has(D.audio.mediaId) ? D.audio : null,
+    layers: (D.layers || []).filter(l => l.type === 'text' || l.type === 'shape' || media.has(l.mediaId)) };
+  if (S.bg.type === 'image' && !media.has(S.bg.mediaId)) S.bg.type = 'gradient';
+  if (!S.layers.some(l => l.id === sel)) sel = null;
+  T = clamp(T, 0, S.duration);
+  syncSizeSel(); fitCanvas(); renderAll();
+}
+function restore(s) { loadDoc(JSON.parse(s)); updateUndo(); store.saveSoon(); }
+function undo() { if (hi > 0) { hi--; restore(hist[hi]); } }
+function redo() { if (hi < hist.length - 1) { hi++; restore(hist[hi]); } }
+function updateUndo() { $('#undoBtn').disabled = hi <= 0; $('#redoBtn').disabled = hi >= hist.length - 1; }
+
+const store = {
+  db: null, timer: 0,
+  open() {
+    if (this.db) return this.db;
+    this.db = new Promise((res, rej) => {
+      try { const r = indexedDB.open('lamsa-studio', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }
+      catch (e) { rej(e); }
+    });
+    return this.db;
+  },
+  async put(k, v) { const db = await this.open(); return new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); },
+  async get(k) { const db = await this.open(); return new Promise((res, rej) => { const r = db.transaction('kv').objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  putMedia(m) { if (m.blob.size > 300e6) return; this.put('m:' + m.id, { id: m.id, kind: m.kind, name: m.name, blob: m.blob }).catch(() => {}); },
+  saveSoon() { if (!booted) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.put('doc', { doc: snap(), lib: [...media.keys()] }).catch(() => {}), 800); },
+  async load() {
+    const saved = await this.get('doc'); if (!saved) return false;
+    for (const id of saved.lib || []) { try { const r = await this.get('m:' + id); if (r) await makeMedia(r.kind, r.blob, r.name, r.id, true); } catch (e) {} }
+    loadDoc(JSON.parse(saved.doc)); return true;
+  },
+};
+
+/* ---------- downloads ---------- */
+const dlCap = (window.claude && typeof window.claude.use === 'function') ? window.claude.use('downloads').catch(() => null) : Promise.resolve(null);
+async function saveFile(blob, filename) {
+  const dl = await dlCap;
+  if (dl) {
+    try { await dl.save({ filename, data: blob }); toast('تم حفظ الملف.'); }
+    catch (e) {
+      const c = e && e.code;
+      toast(c === 'declined' ? 'أُلغي الحفظ.' : c === 'rate_limited' ? 'هناك نافذة حفظ مفتوحة بالفعل، أكملها ثم أعد المحاولة.' : c === 'too_large' ? 'الملف أكبر من المسموح هنا، صدّر بمدة أقصر.' : 'تعذّر حفظ الملف في هذه الصفحة.');
+    }
+    return;
+  }
+  const a = h('a', { href: URL.createObjectURL(blob), download: filename });
+  document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+  toast('بدأ تنزيل الملف.');
+}
+const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+
+/* ---------- export ---------- */
+let exScale = 1, rec = null, exCancelled = false;
+function pickMime(audio = true) {
+  if (!window.MediaRecorder || !cv.captureStream) return null;
+  const a = audio ? ',mp4a.40.2' : '', o = audio ? ',opus' : '';
+  const c = [[`video/mp4;codecs=avc1.640028${a}`, 'mp4'], [`video/mp4;codecs=avc1${a}`, 'mp4'], ['video/mp4', 'mp4'], [`video/webm;codecs=vp9${o}`, 'webm'], [`video/webm;codecs=vp8${o}`, 'webm'], ['video/webm', 'webm']];
+  for (const [m, ext] of c) if (MediaRecorder.isTypeSupported(m)) return { mime: m, ext };
+  return null;
+}
+function openExport() {
+  if (playing) pause();
+  const mm = pickMime();
+  $('#exVidName').textContent = mm ? `فيديو ${mm.ext.toUpperCase()}` : 'فيديو';
+  $('#exVidSub').textContent = mm ? `${fmtT(S.duration)} · مع الحركات والصوت` : 'متصفحك لا يدعم تسجيل الفيديو. جرّب كروم أو سفاري حديثًا.';
+  $('.exopt[data-fmt="video"]').disabled = !mm;
+  $('#exNote').textContent = 'يُصنع الملف على جهازك؛ لا تُرفع صورك أو مقاطعك إلى أي خادم.';
+  $('#exChoose').hidden = false; $('#exProg').hidden = true; $('#exportModal').hidden = false;
+  $('.exopt[data-fmt="png"]').focus();
+}
+function closeExport() { if (exporting) return; $('#exportModal').hidden = true; }
+async function exportImage(type) {
+  const c = document.createElement('canvas'); c.width = Math.round(S.w * exScale); c.height = Math.round(S.h * exScale);
+  render(c.getContext('2d'), S, T, { anim: animPreview, selection: false, scale: exScale });
+  RS = 1;
+  const blob = await new Promise(r => c.toBlob(r, type === 'jpg' ? 'image/jpeg' : 'image/png', .93));
+  if (!blob) { toast('تعذّر إنشاء الصورة. جرّب دقة أقل.'); return; }
+  closeExport();
+  await saveFile(blob, `lamsa-${stamp()}.${type}`);
+}
+async function exportVideo() {
+  if (!pickMime()) return;
+  ensureAudio();
+  exporting = true; exCancelled = false;
+  $('#exChoose').hidden = true; $('#exProg').hidden = false; $('#exBar').style.width = '0';
+  $('#exProgTxt').textContent = 'جارِ تسجيل الفيديو… ابقَ في هذه الصفحة حتى ينتهي.';
+  T = 0; syncMedia(false);
+  await Promise.all(S.layers.filter(l => l.type === 'video').map(l => { const el = media.get(l.mediaId).el; return el.seeking ? once(el, 'seeked').catch(() => {}) : null; }));
+  draw();
+  const stream = cv.captureStream(30);
+  const hasAudio = !!(actx && (S.audio || S.layers.some(l => l.type === 'video' && !l.muted && l.volume > 0)));
+  const mm = pickMime(hasAudio) || pickMime();
+  if (hasAudio) adest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+  const chunks = [];
+  try { rec = new MediaRecorder(stream, { mimeType: mm.mime, videoBitsPerSecond: Math.min(16e6, S.w * S.h * 6) }); }
+  catch (e) { rec = new MediaRecorder(stream); }
+  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  const done = new Promise(r => { rec.onstop = r; });
+  rec.start(250);
+  const prog = setInterval(() => { $('#exBar').style.width = (T / S.duration * 100) + '%'; }, 200);
+  await new Promise(r => setTimeout(r, 120));
+  onPlayEnd = () => setTimeout(() => rec.state !== 'inactive' && rec.stop(), 200);
+  play();
+  await done;
+  clearInterval(prog); exporting = false; stream.getVideoTracks().forEach(t => t.stop());
+  if (playing) pause();
+  requestDraw();
+  if (exCancelled) { $('#exportModal').hidden = true; toast('أُلغي التصدير.'); return; }
+  $('#exBar').style.width = '100%';
+  const blob = new Blob(chunks, { type: mm.mime.split(';')[0] });
+  $('#exportModal').hidden = true;
+  await saveFile(blob, `lamsa-${stamp()}.${mm.ext}`);
+}
+
+/* ---------- UI: controls ---------- */
+let changedTimer = 0;
+function changed() { requestDraw(); clearTimeout(changedTimer); changedTimer = setTimeout(() => { renderTracks(); if (tab === 'layers') renderTools(); }, 120); }
+const label = (t, out) => h('label', {}, h('span', {}, t), out || null);
+function ctlRange(t, obj, key, min, max, step = 1, fmt = '') {
+  const f = typeof fmt === 'function' ? fmt : v => (Math.round(v * 100) / 100) + fmt;
+  const out = h('output', {}, f(obj[key]));
+  const inp = h('input', { type: 'range', min, max, step, value: obj[key], 'aria-label': t });
+  inp.addEventListener('input', () => { obj[key] = +inp.value; out.textContent = f(+inp.value); changed(); });
+  inp.addEventListener('change', commit);
+  return h('div', { class: 'ctl' }, label(t, out), inp);
+}
+function ctlColor(t, obj, key) {
+  const inp = h('input', { type: 'color', value: obj[key], 'aria-label': t });
+  inp.addEventListener('input', () => { obj[key] = inp.value; changed(); });
+  inp.addEventListener('change', commit);
+  const sw = h('div', { class: 'sw' }, SWATCHES.map(c => h('button', { type: 'button', style: `--c:${c}`, title: c, 'aria-label': c, onclick: () => { obj[key] = c; inp.value = c; changed(); commit(); } })));
+  return h('div', { class: 'ctl' }, label(t), h('div', { class: 'colrow' }, inp, sw));
+}
+function ctlSeg(t, obj, key, opts, after) {
+  const btns = opts.map(([v, txt]) => h('button', { type: 'button', 'aria-pressed': String(obj[key] === v), onclick: () => {
+    obj[key] = v; btns.forEach((b, i) => b.setAttribute('aria-pressed', String(opts[i][0] === v))); changed(); commit(); after && after();
+  } }, txt));
+  return h('div', { class: 'ctl' }, t ? label(t) : null, h('div', { class: 'seg', role: 'group', 'aria-label': t || null }, btns));
+}
+function ctlToggle(t, obj, key, after) {
+  const inp = h('input', { type: 'checkbox' }); inp.checked = !!obj[key];
+  inp.addEventListener('change', () => { obj[key] = inp.checked; changed(); commit(); after && after(); });
+  return h('label', { class: 'tog' }, h('span', {}, t), inp);
+}
+function ctlSelect(t, obj, key, opts, after) {
+  const s = h('select', { 'aria-label': t }, opts.map(([v, txt]) => h('option', { value: v }, txt)));
+  s.value = String(obj[key]);
+  s.addEventListener('change', () => { obj[key] = typeof obj[key] === 'number' ? +s.value : s.value; changed(); commit(); after && after(); });
+  return h('div', { class: 'ctl' }, label(t), s);
+}
+function ctlFill(t, f, after) {
+  return [ctlSeg(t, f, 'type', [['solid', 'لون'], ['gradient', 'تدرّج'], ['gold', 'ذهبي'], ['silver', 'فضي'], ['rose', 'نحاسي']], after),
+    f.type === 'solid' ? ctlColor('اللون', f, 'c1') : null,
+    f.type === 'gradient' ? [ctlColor('اللون الأول', f, 'c1'), ctlColor('اللون الثاني', f, 'c2'), ctlRange('زاوية التدرّج', f, 'angle', 0, 360, 1, '°')] : null];
+}
+const sec = (t, ...kids) => h('section', { class: 'sec' }, t ? h('h3', {}, t) : null, ...kids);
+const pct = v => Math.round(v * 100) + '٪';
+const sec1 = v => (+v).toFixed(1) + ' ث';
+
+/* ---------- UI: tools panel ---------- */
+const TABS = [['templates', 'قوالب', 'templates'], ['text', 'نص', 'text'], ['media', 'وسائط', 'media'], ['shapes', 'أشكال', 'shapes'], ['bg', 'خلفية', 'bg'], ['layers', 'طبقات', 'layers'], ['props', 'تعديل', 'props']];
+function renderRail() {
+  $('#rail').replaceChildren(...TABS.map(([id, t, ic]) => h('button', { class: id === 'props' ? 'only-m' : null, 'aria-current': String(tab === id), onclick: () => setTab(id) }, icon(ic), t)));
+}
+function setTab(id) {
+  if (id === 'props' && !mq.matches) id = 'templates';
+  tab = id; $('#app').classList.toggle('show-props', id === 'props');
+  renderRail(); if (id !== 'props') renderTools(); else renderProps();
+}
+function pickFiles(accept, multiple, cb) {
+  const fi = $('#fileIn'); fi.accept = accept; fi.multiple = multiple; fi.value = '';
+  fi.onchange = () => { if (fi.files.length) cb([...fi.files]); };
+  fi.click();
+}
+const thumbCache = new Map();
+function templateThumb(tp) {
+  const D = tp._d || (tp._d = tp.make());
+  const c = h('canvas', { 'aria-hidden': 'true' }); const k = 260 / Math.max(D.w, D.h);
+  c.width = Math.round(D.w * k); c.height = Math.round(D.h * k);
+  render(c.getContext('2d'), D, 0, { anim: false, selection: false, scale: k }); RS = 1;
+  return c;
+}
+function renderTools() {
+  const box = $('#tools'); box.replaceChildren();
+  const add = (...n) => box.append(...n.flat(Infinity).filter(Boolean));
+  if (tab === 'templates' || tab === 'props') {
+    add(h('h2', { class: 'ptitle' }, 'القوالب'), h('p', { class: 'psub' }, 'ابدأ من قالب جاهز ثم عدّل كل شيء فيه. يمكنك التراجع دائمًا.'));
+    add(sec(null, h('div', { class: 'grid2' }, TEMPLATES.map(tp => h('button', { class: 'card', onclick: () => { const D = tp.make(); sel = null; T = 0; animPreview = false; loadDoc(D); commit(); toast(`فُتح قالب «${tp.name}».`); } },
+      templateThumb(tp), h('span', {}, tp.name), h('small', {}, `${dim(tp._d.w, tp._d.h)}${tp._d.layers.some(l => l.anim.in !== 'none') ? ' · متحرك' : ''}`))))));
+    const cw = { w: S.w, h: S.h };
+    add(sec('تصميم فارغ',
+      h('button', { class: 'btn block', onclick: () => { sel = null; T = 0; loadDoc(newDoc(S.w, S.h)); commit(); toast('بدأت تصميمًا جديدًا. اضغط تراجع لاستعادة السابق.'); } }, icon('plus'), 'صفحة جديدة بالمقاس الحالي'),
+      h('div', { class: 'row2' }, ctlNum('العرض (بكسل)', cw, 'w', 100, 4000), ctlNum('الارتفاع (بكسل)', cw, 'h', 100, 4000)),
+      h('button', { class: 'btn block', id: 'customSizeBtn', onclick: () => setSize(clamp(Math.round(cw.w), 100, 4000), clamp(Math.round(cw.h), 100, 4000)) }, 'تطبيق المقاس المخصص')));
+  } else if (tab === 'text') {
+    add(h('h2', { class: 'ptitle' }, 'النصوص'), h('p', { class: 'psub' }, 'اثنا عشر خطًا عربيًا، مع تعبئة ذهبية وظلال وحركات.'));
+    add(sec('إضافة نص',
+      h('button', { class: 'btn block', style: 'font:700 20px var(--f-display)', onclick: () => addLayer(mkText(S, { text: 'عنوان رئيسي', font: 'Reem Kufi', size: Math.round(S.w * .1) })) }, 'عنوان رئيسي'),
+      h('button', { class: 'btn block', style: 'font-weight:600;font-size:16px', onclick: () => addLayer(mkText(S, { text: 'عنوان فرعي', font: 'Cairo', size: Math.round(S.w * .06) })) }, 'عنوان فرعي'),
+      h('button', { class: 'btn block', onclick: () => addLayer(mkText(S, { text: 'اكتب النص هنا\nبسطر ثانٍ إن أردت', font: 'Tajawal', weight: 400, size: Math.round(S.w * .04), lineH: 1.6 })) }, 'فقرة نصية')));
+    add(sec('أنماط جاهزة', h('div', { class: 'grid2' }, TEXT_STYLES.map(s => h('button', { class: 'style-card', style: s.css, title: s.n, onclick: () => {
+      const k = S.w / 1080; const o = merge({}, s.o); o.size = Math.round(o.size * k); addLayer(mkText(S, o)); } }, s.n)))));
+  } else if (tab === 'media') {
+    add(h('h2', { class: 'ptitle' }, 'الصور والفيديو'), h('p', { class: 'psub' }, 'أضف من جهازك، أو اسحب الملفات وأفلتها على مساحة التصميم، أو الصق صورة.'));
+    const ss = { per: 3, effect: 'zoom' };
+    add(sec('إضافة',
+      h('button', { class: 'btn gold block', onclick: () => pickFiles('image/*', true, f => addFiles(f)) }, icon('image'), 'إضافة صور'),
+      h('button', { class: 'btn block', onclick: () => pickFiles('video/*', false, f => addFiles(f)) }, icon('video'), 'إضافة فيديو')));
+    add(sec('فيديو من الصور',
+      h('p', { class: 'hint' }, 'اختر عدة صور فتُعرض متتابعة بانتقالات ناعمة، ثم أضف موسيقى وعناوين وصدّرها فيديو.'),
+      ctlRange('مدة كل صورة', ss, 'per', 1, 10, .5, sec1),
+      ctlSeg('الانتقال', ss, 'effect', [['zoom', 'زووم سينمائي'], ['fade', 'تلاشٍ'], ['slide', 'انزلاق']]),
+      h('button', { class: 'btn block', onclick: () => pickFiles('image/*', true, f => makeSlideshow(f, ss.per, ss.effect)) }, icon('film'), 'اختيار الصور وصنع الفيديو')));
+    const am = S.audio && media.get(S.audio.mediaId);
+    add(sec('الموسيقى والصوت', am ? [
+      h('div', { class: 'note' }, icon('music'), ' ', am.name || 'مقطع صوتي', ` · ${fmtT(am.dur)}`),
+      ctlRange('مستوى الصوت', S.audio, 'volume', 0, 1, .05, pct),
+      ctlToggle('خفوت تدريجي في النهاية', S.audio, 'fade'),
+      h('div', { class: 'row2' },
+        h('button', { class: 'btn', onclick: () => pickFiles('audio/*', false, f => addFiles(f, 'audio')) }, 'استبدال'),
+        h('button', { class: 'btn danger', onclick: () => { S.audio = null; syncMedia(false); am.el.pause(); commit(); renderTools(); } }, icon('trash'), 'إزالة')),
+    ] : [h('p', { class: 'hint' }, 'تُضاف الموسيقى إلى الفيديو المصدَّر من البداية حتى النهاية.'),
+      h('button', { class: 'btn block', onclick: () => pickFiles('audio/*', false, f => addFiles(f, 'audio')) }, icon('music'), 'إضافة موسيقى')]));
+    const lib = [...media.values()].filter(m => m.kind !== 'audio');
+    if (lib.length) add(sec('ملفاتك', h('p', { class: 'hint' }, 'اضغط على ملف لإضافته مرة أخرى.'), h('div', { class: 'grid3' }, lib.map(m => h('button', { class: 'media-thumb', title: m.name, 'aria-label': m.name || TYPE_NAMES[m.kind],
+      onclick: async () => { const mm = m.kind === 'video' && S.layers.some(l => l.mediaId === m.id) ? await cloneVideoMedia(m) : m; addMediaLayer(mm); } },
+      m.kind === 'image' ? h('img', { src: m.url, alt: '' }) : h('video', { src: m.url + '#t=0.5', muted: true, playsinline: true, preload: 'metadata' }),
+      m.kind === 'video' ? h('em', {}, fmtT(m.dur)) : null)))));
+    add(sec(null, h('p', { class: 'note' }, 'كل المعالجة تتم داخل متصفحك. ملفاتك لا تُرفع إلى أي مكان.')));
+  } else if (tab === 'shapes') {
+    add(h('h2', { class: 'ptitle' }, 'الأشكال والزخارف'), h('p', { class: 'psub' }, 'أشكال أساسية وزخارف مستوحاة من الفن الإسلامي.'));
+    add(sec('أشكال', h('div', { class: 'grid3' }, SHAPES.map(([k, n]) => h('button', { class: 'shape-btn', title: n, 'aria-label': n, onclick: () => {
+      const s = Math.round(Math.min(S.w, S.h) * .3);
+      addLayer(mkShape(S, k === 'line' ? { shape: 'line', w: s * 1.6, h: Math.max(3, Math.round(S.w / 300)), fill: gold } : { shape: k, w: k === 'arch' ? s : s, h: k === 'arch' ? s * 1.45 : s }));
+    } }, shapePreview(k, false))))));
+    const s = Math.min(S.w, S.h);
+    add(sec('زخارف ذهبية', h('div', { class: 'grid2' },
+      deco('إطار مزدوج', () => { const a = mkShape(S, { w: S.w * .9, h: S.h * .9, fillOn: false, stroke: { on: true, w: 3, fill: gold } }); const b = mkShape(S, { w: S.w * .9 - 34, h: S.h * .9 - 34, fillOn: false, opacity: .5, stroke: { on: true, w: 1.5, fill: gold } }); S.layers.push(a); addLayer(b); }),
+      deco('نجمة ثمانية', () => addLayer(mkShape(S, { shape: 'star8', w: s * .12, h: s * .12, fill: gold, anim: { in: 'spin' } }))),
+      deco('فاصل ذهبي', () => addLayer(mkShape(S, { shape: 'line', w: s * .25, h: 3, fill: gold, anim: { in: 'zoom' } }))),
+      deco('قوس محراب', () => addLayer(mkShape(S, { shape: 'arch', w: s * .7, h: s * .7 * 1.5, fillOn: false, stroke: { on: true, w: 4, fill: gold } }))),
+      deco('دائرة مضيئة', () => addLayer(mkShape(S, { shape: 'ellipse', w: s * .6, h: s * .6, fillOn: false, stroke: { on: true, w: 2, fill: gold }, shadow: { on: true, color: '#d4b06a', alpha: .8, blur: 30, y: 0 }, anim: { loop: 'pulse' } }))),
+      deco('شريط داكن', () => addLayer(mkShape(S, { w: S.w, h: S.h * .16, y: S.h * .85, fill: { c1: '#000000' }, opacity: .55, anim: { in: 'up' } }))),
+    )));
+  } else if (tab === 'bg') {
+    const b = S.bg;
+    add(h('h2', { class: 'ptitle' }, 'الخلفية'), h('p', { class: 'psub' }, 'لون أو تدرّج أو صورة، مع لمسات سينمائية.'));
+    add(sec('النوع', ctlSeg(null, b, 'type', [['solid', 'لون'], ['gradient', 'تدرّج'], ['image', 'صورة']], () => { if (b.type === 'image' && !media.has(b.mediaId)) pickFiles('image/*', false, f => addFiles(f, 'bg')); renderTools(); }),
+      b.type === 'solid' ? ctlColor('اللون', b, 'c1') : null,
+      b.type === 'gradient' ? [ctlColor('اللون الأول', b, 'c1'), ctlColor('اللون الثاني', b, 'c2'), ctlRange('الزاوية', b, 'angle', 0, 360, 1, '°')] : null,
+      b.type === 'image' ? [h('button', { class: 'btn block', onclick: () => pickFiles('image/*', false, f => addFiles(f, 'bg')) }, icon('image'), media.has(b.mediaId) ? 'تغيير صورة الخلفية' : 'اختيار صورة'),
+        ctlRange('تمويه', b, 'blur', 0, 40, 1, ' بكسل'), ctlRange('تعتيم', b, 'dim', 0, 90, 1, '٪')] : null));
+    add(sec('تدرّجات فاخرة', h('div', { class: 'grads' }, GRADS.map(([n, c1, c2]) => h('button', { title: n, 'aria-label': n, style: `--g:linear-gradient(160deg,${c1},${c2})`, onclick: () => { Object.assign(b, { type: 'gradient', c1, c2, angle: 160 }); commit(); renderTools(); requestDraw(); } })))));
+    add(sec('لمسات سينمائية', ctlRange('إطار معتم (فينيت)', b, 'vignette', 0, 100, 1, '٪'), ctlRange('حبيبات الفيلم', b, 'grain', 0, 100, 1, '٪')));
+  } else if (tab === 'layers') {
+    add(h('h2', { class: 'ptitle' }, 'الطبقات'), h('p', { class: 'psub' }, 'العنصر الأعلى في القائمة يظهر فوق البقية.'));
+    if (!S.layers.length) add(sec(null, h('p', { class: 'hint' }, 'لا توجد عناصر بعد. أضف نصًا أو صورة من الأدوات.')));
+    add(h('div', { class: 'layers sec' }, [...S.layers].reverse().map(l => h('div', { class: 'layer', 'aria-selected': String(l.id === sel) },
+      h('span', { class: 'ty' }, icon(l.type === 'text' ? 'text' : l.type === 'shape' ? 'shape' : l.type)),
+      h('button', { class: 'nm', onclick: () => { sel = l.id; animPreview = false; afterSelect(true); } }, layerName(l)),
+      h('button', { class: 'ibtn', title: l.hidden ? 'إظهار' : 'إخفاء', 'aria-label': l.hidden ? 'إظهار' : 'إخفاء', onclick: () => { l.hidden = !l.hidden; commit(); renderTools(); requestDraw(); } }, icon(l.hidden ? 'eyeoff' : 'eye')),
+      h('button', { class: 'ibtn', title: l.locked ? 'فك القفل' : 'قفل', 'aria-label': l.locked ? 'فك القفل' : 'قفل', onclick: () => { l.locked = !l.locked; commit(); renderTools(); requestDraw(); } }, icon(l.locked ? 'lock' : 'unlock')),
+      h('button', { class: 'ibtn', title: 'للأمام', 'aria-label': 'للأمام', onclick: () => moveLayer(l, 1) }, icon('up')),
+      h('button', { class: 'ibtn', title: 'للخلف', 'aria-label': 'للخلف', onclick: () => moveLayer(l, -1) }, icon('down'))))));
+  }
+}
+function ctlNum(t, obj, key, min, max) {
+  const inp = h('input', { type: 'number', min, max, value: obj[key], 'aria-label': t, inputmode: 'numeric' });
+  inp.addEventListener('input', () => { obj[key] = +inp.value || obj[key]; });
+  return h('div', { class: 'ctl' }, label(t), inp);
+}
+function deco(n, fn) { return h('button', { class: 'btn', onclick: fn }, n); }
+function shapePreview(k) {
+  const c = h('canvas', { width: 80, height: 80, 'aria-hidden': 'true' }), g = c.getContext('2d');
+  g.translate(40, 40); const p = k === 'line' ? shapePath('rect', 60, 4) : shapePath(k, k === 'arch' ? 42 : 56, k === 'arch' ? 62 : 56, k === 'rect' ? 8 : 0);
+  g.fillStyle = makeFill(g, gold, 56, 56); g.fill(p); return c;
+}
+function layerName(l) {
+  if (l.type === 'text') return (String(l.text).split('\n')[0] || 'نص').slice(0, 28);
+  if (l.type === 'shape') return SHAPE_NAMES[l.shape] || 'شكل';
+  const m = media.get(l.mediaId); return (m && m.name) ? `${TYPE_NAMES[l.type]} · ${m.name}` : TYPE_NAMES[l.type];
+}
+
+/* ---------- UI: properties panel ---------- */
+function renderProps() {
+  const box = $('#props'); box.replaceChildren();
+  const l = cur();
+  const add = (...n) => box.append(...n.flat(Infinity).filter(Boolean));
+  const rp = () => renderProps();
+  if (!l) {
+    add(h('h2', { class: 'ptitle' }, 'الخصائص'), h('p', { class: 'psub' }, 'اختر عنصرًا من التصميم لتعديله.'));
+    add(sec('إضافة سريعة', h('div', { class: 'row2' },
+      h('button', { class: 'btn', onclick: () => addLayer(mkText(S, { text: 'عنوان رئيسي', font: 'Reem Kufi', size: Math.round(S.w * .1) })) }, icon('text'), 'نص'),
+      h('button', { class: 'btn', onclick: () => pickFiles('image/*,video/*', true, f => addFiles(f)) }, icon('image'), 'صورة أو فيديو'))));
+    add(sec('المشروع', h('div', { class: 'note' }, `المقاس ${dim(S.w, S.h)} بكسل · المدة ${fmtT(S.duration)} · ${S.layers.length} عناصر`),
+      ctlRange('مدة الفيديو', S, 'duration', 1, Math.max(60, S.duration), .5, sec1)));
+    add(sec('طريقة الاستخدام', h('p', { class: 'hint' }, 'اسحب العنصر لتحريكه. المربعات في الزوايا تغيّر الحجم، والدائرة في الأعلى تدوّره. على الجوال يمكنك القرص بإصبعين للتكبير والتدوير. انقر مرتين على نص لتعديله.'),
+      h('p', { class: 'hint' }, 'اختصارات: Ctrl+Z تراجع، Ctrl+D تكرار، Delete حذف، الأسهم للتحريك الدقيق، المسافة للتشغيل.')));
+    return;
+  }
+  add(h('div', { class: 'phead' }, h('div', {}, h('small', {}, TYPE_NAMES[l.type]), h('strong', {}, layerName(l))),
+    h('div', { class: 'acts' },
+      h('button', { class: 'ibtn sm', title: 'تكرار', 'aria-label': 'تكرار', onclick: duplicate }, icon('copy')),
+      h('button', { class: 'ibtn sm', title: 'إحضار للأمام', 'aria-label': 'إحضار للأمام', onclick: () => moveLayer(l, 1) }, icon('front')),
+      h('button', { class: 'ibtn sm', title: 'إرسال للخلف', 'aria-label': 'إرسال للخلف', onclick: () => moveLayer(l, -1) }, icon('back')),
+      h('button', { class: 'ibtn sm', title: 'حذف', 'aria-label': 'حذف', onclick: removeSel }, icon('trash')))));
+  if (l.type === 'text') {
+    const ta = h('textarea', { id: 'textEdit', dir: 'auto', value: l.text, 'aria-label': 'النص', rows: 3 });
+    ta.addEventListener('input', () => { l.text = ta.value; changed(); });
+    ta.addEventListener('change', () => { commit(); renderTools(); });
+    add(sec('النص', ta,
+      h('div', { class: 'fonts', role: 'group', 'aria-label': 'الخط' }, FONTS.map(([f, n]) => h('button', { type: 'button', style: `font-family:"${f}"`, 'aria-pressed': String(l.font === f), onclick: () => {
+        l.font = f; document.fonts && document.fonts.load(fontStr(l), l.text).then(requestDraw).catch(() => {}); commit(); rp(); requestDraw(); } }, n))),
+      h('div', { class: 'row2' },
+        ctlSelect('السماكة', l, 'weight', [[400, 'عادي'], [700, 'عريض'], [900, 'أسود']]),
+        ctlSeg('المحاذاة', l, 'align', [['right', 'يمين'], ['center', 'وسط'], ['left', 'يسار']])),
+      ctlRange('الحجم', l, 'size', 10, Math.max(400, Math.round(S.w * .4)), 1, ' بكسل'),
+      ctlRange('تباعد الأسطر', l, 'lineH', .8, 2.6, .05)));
+    add(sec('التلوين', ctlFill('التعبئة', l.fill, rp),
+      ctlToggle('حدّ خارجي', l.stroke, 'on', rp), l.stroke.on ? [ctlColor('لون الحد', l.stroke, 'color'), ctlRange('سماكة الحد', l.stroke, 'w', 1, 40, 1)] : null));
+    add(sec('خلفية النص', ctlToggle('إظهار خلفية خلف النص', l.box, 'on', rp),
+      l.box.on ? [ctlColor('لون الخلفية', l.box, 'color'), ctlRange('شفافية الخلفية', l.box, 'alpha', 0, 1, .05, pct), ctlRange('الهامش', l.box, 'pad', 0, 120, 1), ctlRange('استدارة الزوايا', l.box, 'radius', 0, 300, 1)] : null));
+  } else if (l.type === 'shape') {
+    add(sec('الشكل', ctlSelect('نوع الشكل', l, 'shape', SHAPES, rp),
+      l.shape === 'rect' ? ctlRange('استدارة الزوايا', l, 'radius', 0, Math.round(Math.min(l.w, l.h) / 2), 1) : null,
+      ctlToggle('تعبئة', l, 'fillOn', rp), l.fillOn ? ctlFill('لون التعبئة', l.fill, rp) : null,
+      ctlToggle('حدّ خارجي', l.stroke, 'on', rp), l.stroke.on ? [ctlRange('سماكة الحد', l.stroke, 'w', .5, 60, .5), ctlFill('لون الحد', l.stroke.fill, rp)] : null));
+  } else {
+    const m = media.get(l.mediaId);
+    add(sec('الفلاتر', h('div', { class: 'seg' }, FILTERS.map(([n, f]) => h('button', { type: 'button', onclick: () => { l.f = { ...F0, ...f }; commit(); rp(); requestDraw(); } }, n))),
+      ctlRange('السطوع', l.f, 'bright', 0, 200, 1, '٪'), ctlRange('التباين', l.f, 'contrast', 0, 200, 1, '٪'), ctlRange('التشبّع', l.f, 'sat', 0, 250, 1, '٪'),
+      ctlRange('دفء (سيبيا)', l.f, 'sepia', 0, 100, 1, '٪'), ctlRange('أبيض وأسود', l.f, 'gray', 0, 100, 1, '٪'), ctlRange('تدوير الألوان', l.f, 'hue', -180, 180, 1, '°'), ctlRange('تمويه', l.f, 'blur', 0, 30, .5)));
+    add(sec('الإطار والقص', ctlSeg('شكل الإطار', l, 'mask', [['none', 'مستطيل'], ['circle', 'دائرة'], ['arch', 'قوس']], rp),
+      l.mask === 'none' ? ctlRange('استدارة الزوايا', l, 'radius', 0, Math.round(Math.min(l.w, l.h) / 2), 1) : null,
+      h('div', { class: 'row2' }, ctlRange('موضع القص أفقيًا', l, 'fx', 0, 100, 1, '٪'), ctlRange('موضع القص رأسيًا', l, 'fy', 0, 100, 1, '٪')),
+      h('div', { class: 'row2' },
+        h('button', { class: 'btn', onclick: () => { Object.assign(l, { x: S.w / 2, y: S.h / 2, w: S.w, h: S.h, rot: 0 }); commit(); requestDraw(); } }, 'ملء الصفحة'),
+        h('button', { class: 'btn', onclick: () => { const k = Math.min(S.w / m.w, S.h / m.h); Object.assign(l, { x: S.w / 2, y: S.h / 2, w: m.w * k, h: m.h * k, rot: 0 }); commit(); requestDraw(); } }, 'احتواء كامل')),
+      ctlToggle('إطار حول الصورة', l.border, 'on', rp), l.border.on ? [ctlColor('لون الإطار', l.border, 'color'), ctlRange('سماكة الإطار', l.border, 'w', 1, 60, 1)] : null));
+    if (l.type === 'video') add(sec('الفيديو',
+      h('div', { class: 'note' }, `طول المقطع ${fmtT(m.dur)}`),
+      ctlRange('بداية المقطع (قص من الأول)', l, 'trim', 0, Math.max(0, Math.floor((m.dur - .5) * 10) / 10), .1, sec1),
+      ctlRange('مستوى الصوت', l, 'volume', 0, 1, .05, pct), ctlToggle('كتم صوت المقطع', l, 'muted')));
+  }
+  add(sec('المظهر', ctlRange('الشفافية', l, 'opacity', 0, 1, .01, pct), ctlRange('التدوير', l, 'rot', -180, 180, 1, '°'),
+    h('div', { class: 'row3' },
+      h('button', { class: 'btn', title: 'توسيط أفقي', onclick: () => { l.x = S.w / 2; commit(); requestDraw(); } }, 'توسيط ↔'),
+      h('button', { class: 'btn', title: 'توسيط رأسي', onclick: () => { l.y = S.h / 2; commit(); requestDraw(); } }, 'توسيط ↕'),
+      h('button', { class: 'btn', title: 'قلب أفقي', 'aria-label': 'قلب أفقي', onclick: () => { l.flipX = !l.flipX; commit(); requestDraw(); } }, icon('flipx')))));
+  add(sec('الظل والتوهّج', ctlToggle('ظل', l.shadow, 'on', rp),
+    l.shadow.on ? [ctlColor('اللون', l.shadow, 'color'), ctlRange('الكثافة', l.shadow, 'alpha', 0, 1, .05, pct), ctlRange('النعومة', l.shadow, 'blur', 0, 150, 1),
+      h('div', { class: 'row2' }, ctlRange('إزاحة أفقية', l.shadow, 'x', -80, 80, 1), ctlRange('إزاحة رأسية', l.shadow, 'y', -80, 80, 1))] : null));
+  const tm = { end: layerEnd(l) };
+  const endCtl = ctlRange('نهاية الظهور', tm, 'end', 0, S.duration, .1, sec1);
+  endCtl.querySelector('input').addEventListener('input', () => { l.anim.end = tm.end >= S.duration - .05 ? null : Math.max(tm.end, l.anim.start + .1); });
+  add(sec('الحركة والتوقيت',
+    h('p', { class: 'hint' }, 'تظهر الحركات في المعاينة وفي الفيديو المصدَّر.'),
+    ctlSelect('حركة الدخول', l.anim, 'in', IN_ANIMS.filter(a => a[0] !== 'type' || l.type === 'text'), previewAnim),
+    ctlSelect('حركة الخروج', l.anim, 'out', OUT_ANIMS, previewAnim),
+    ctlSelect('حركة مستمرة', l.anim, 'loop', LOOPS, previewAnim),
+    ctlRange('سرعة الحركة', l.anim, 'dur', .2, 3, .1, sec1),
+    ctlRange('بداية الظهور', l.anim, 'start', 0, Math.max(0, S.duration - .1), .1, sec1),
+    endCtl,
+    h('button', { class: 'btn block', onclick: previewAnim }, icon('play'), 'معاينة الحركة')));
+}
+function previewAnim() { const l = cur(); if (!l) return; T = Math.max(0, l.anim.start - .05); play(); }
+
+/* ---------- actions ---------- */
+function afterSelect(fromUser) {
+  renderProps(); renderTracks();
+  if (tab === 'layers') renderTools();
+  if (fromUser && mq.matches && sel && tab !== 'props') setTab('props');
+  if (mq.matches && !sel && tab === 'props') renderProps();
+  requestDraw();
+}
+function select(id, fromUser) { if (sel === id) return; sel = id; afterSelect(fromUser); }
+function moveLayer(l, dir) {
+  const i = S.layers.indexOf(l), j = i + dir; if (j < 0 || j >= S.layers.length) return;
+  S.layers.splice(i, 1); S.layers.splice(j, 0, l); commit(); renderTools(); requestDraw();
+}
+async function duplicate() {
+  const l = cur(); if (!l) return;
+  const c = JSON.parse(JSON.stringify(l)); c.id = uid(); c.x += S.w * .03; c.y += S.h * .03;
+  if (c.type === 'video') { const m = media.get(l.mediaId); if (m) c.mediaId = (await cloneVideoMedia(m)).id; }
+  S.layers.splice(S.layers.indexOf(l) + 1, 0, c); sel = c.id; commit(); afterSelect();
+}
+function removeSel() {
+  const l = cur(); if (!l) return;
+  if (l.type === 'video') { const m = media.get(l.mediaId); m && m.el.pause(); }
+  S.layers = S.layers.filter(x => x !== l); sel = null; commit(); afterSelect(); renderTools();
+  toast('حُذف العنصر. اضغط تراجع لاستعادته.');
+}
+function setSize(w, hh) {
+  if (w === S.w && hh === S.h) return;
+  const rw = w / S.w, rh = hh / S.h, k = Math.min(rw, rh);
+  for (const l of S.layers) {
+    l.x *= rw; l.y *= rh;
+    if (l.type === 'text') { l.size *= k; if (l.box.on) l.box.pad *= k; }
+    else if ((l.type === 'image' || l.type === 'video') && Math.abs(l.w - S.w) < 2 && Math.abs(l.h - S.h) < 2) { l.w = w; l.h = hh; }
+    else { l.w *= k; l.h *= k; }
+  }
+  S.w = w; S.h = hh; commit(); syncSizeSel(); fitCanvas(); renderTools(); renderProps();
+  toast(`المقاس الآن ${dim(w, hh)}.`);
+}
+function syncSizeSel() {
+  const s = $('#sizeSel'), key = `${S.w}x${S.h}`;
+  const opts = SIZES.map(([w, hh, n]) => h('option', { value: `${w}x${hh}` }, `${n} · ${dim(w, hh)}`));
+  if (!SIZES.some(([w, hh]) => `${w}x${hh}` === key)) opts.push(h('option', { value: key }, `مخصص · ${dim(S.w, S.h)}`));
+  opts.push(h('option', { value: 'custom' }, 'مقاس مخصص…'));
+  s.replaceChildren(...opts); s.value = key;
+}
+$('#sizeSel').addEventListener('change', e => {
+  const v = e.target.value;
+  if (v === 'custom') { syncSizeSel(); setTab('templates'); setTimeout(() => { const b = $('#customSizeBtn'); b && b.scrollIntoView({ block: 'center' }); }, 50); return; }
+  const [w, hh] = v.split('x').map(Number); setSize(w, hh);
+});
+
+/* ---------- timeline ---------- */
+function renderTracks() {
+  const box = $('#tracks'); box.replaceChildren();
+  const D = S.duration;
+  for (const l of [...S.layers].reverse()) {
+    const b = h('button', { class: 'track', 'aria-selected': String(l.id === sel), title: layerName(l), 'aria-label': layerName(l), onclick: () => { animPreview = false; select(l.id, true); } });
+    const i = h('i'); i.style.left = (l.anim.start / D * 100) + '%'; i.style.width = Math.max(.5, (layerEnd(l) - l.anim.start) / D * 100) + '%';
+    b.append(i); box.append(b);
+  }
+  const ph = h('div', { class: 'playhead' }); ph.style.left = (T / D * 100) + '%'; box.append(ph);
+}
+$('#scrub').addEventListener('input', e => { if (playing) pause(); T = +e.target.value; animPreview = true; syncMedia(false); requestDraw(); updateTime(); });
+$('#durIn').addEventListener('change', e => { S.duration = clamp(+e.target.value || 6, 1, 600); T = Math.min(T, S.duration); commit(); renderProps(); });
+$('#playBtn').addEventListener('click', () => playing ? pause() : play());
+
+/* ---------- pointer interaction ---------- */
+let drag = null, moved = false;
+const pointers = new Map();
+function toCanvas(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * S.w / r.width, y: (e.clientY - r.top) * S.h / r.height }; }
+cv.addEventListener('pointerdown', e => {
+  if (exporting) return;
+  cv.setPointerCapture(e.pointerId);
+  const p = toCanvas(e); pointers.set(e.pointerId, p);
+  if (playing) pause();
+  if (animPreview) { animPreview = false; }
+  const l = cur();
+  if (pointers.size === 2 && l && !l.locked) {
+    const [a, b] = [...pointers.values()];
+    drag = { mode: 'pinch', l, d0: Math.hypot(a.x - b.x, a.y - b.y), a0: Math.atan2(b.y - a.y, b.x - a.x), w0: l.w, h0: l.h, s0: l.size, r0: l.rot };
+    return;
+  }
+  if (pointers.size > 1) return;
+  moved = false;
+  if (l && !l.locked) {
+    const hd = hitHandle(l, p);
+    if (hd) {
+      const lp = toLocal(l, p);
+      drag = { mode: hd.k, hd, l, d0: Math.max(1, Math.hypot(lp.x, lp.y)), w0: l.w, h0: l.h, s0: l.size, pad0: l.box && l.box.pad };
+      requestDraw(); return;
+    }
+  }
+  const hit = hitTest(p);
+  select(hit ? hit.id : null, false);
+  if (hit && !hit.locked) drag = { mode: 'move', l: hit, sx: p.x, sy: p.y, ox: hit.x, oy: hit.y };
+  requestDraw();
+});
+cv.addEventListener('pointermove', e => {
+  if (!pointers.has(e.pointerId)) {
+    if (!drag && !coarse) { const l = cur(), p = toCanvas(e); const hd = l && !l.locked && hitHandle(l, p); cv.style.cursor = hd ? (hd.k === 'r' ? 'grab' : 'nwse-resize') : (hitTest(p) ? 'move' : 'default'); }
+    return;
+  }
+  const p = toCanvas(e); pointers.set(e.pointerId, p);
+  if (!drag) return;
+  const l = drag.l; moved = true;
+  if (drag.mode === 'pinch') {
+    if (pointers.size < 2) return;
+    const [a, b] = [...pointers.values()];
+    const f = Math.max(.05, Math.hypot(a.x - b.x, a.y - b.y) / Math.max(1, drag.d0));
+    if (l.type === 'text') l.size = clamp(drag.s0 * f, 6, 2000); else { l.w = Math.max(4, drag.w0 * f); l.h = Math.max(2, drag.h0 * f); }
+    l.rot = drag.r0 + (Math.atan2(b.y - a.y, b.x - a.x) - drag.a0) / DEG;
+  } else if (drag.mode === 'move') {
+    let nx = drag.ox + p.x - drag.sx, ny = drag.oy + p.y - drag.sy; const th = 8 * pxk(); guides = [];
+    if (Math.abs(nx - S.w / 2) < th) { nx = S.w / 2; guides.push({ v: S.w / 2 }); }
+    if (Math.abs(ny - S.h / 2) < th) { ny = S.h / 2; guides.push({ hz: S.h / 2 }); }
+    l.x = nx; l.y = ny;
+  } else if (drag.mode === 'r') {
+    let a = Math.atan2(p.y - l.y, p.x - l.x) / DEG + 90;
+    if (a > 180) a -= 360;
+    for (const s of [-180, -90, 0, 90, 180]) if (Math.abs(a - s) < 4) a = s;
+    l.rot = Math.round(a);
+  } else if (drag.mode === 'c') {
+    const lp = toLocal(l, p);
+    if (l.type === 'shape') { l.w = Math.max(4, Math.abs(lp.x) * 2); l.h = Math.max(2, Math.abs(lp.y) * 2); }
+    else {
+      const f = Math.max(.05, Math.hypot(lp.x, lp.y) / drag.d0);
+      if (l.type === 'text') { l.size = clamp(drag.s0 * f, 6, 2000); if (l.box.on) l.box.pad = drag.pad0 * f; }
+      else { l.w = Math.max(8, drag.w0 * f); l.h = Math.max(8, drag.h0 * f); }
+    }
+  } else if (drag.mode === 'e') {
+    const lp = toLocal(l, p);
+    if (drag.hd.sx) l.w = Math.max(4, Math.abs(lp.x) * 2); else l.h = Math.max(2, Math.abs(lp.y) * 2);
+  }
+  requestDraw();
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (drag && (pointers.size === 0 || drag.mode === 'pinch')) {
+    if (moved) { commit(); renderProps(); }
+    else if (drag.mode === 'move' && mq.matches && tab !== 'props') setTab('props');
+    drag = null; guides = []; requestDraw();
+  }
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('dblclick', e => {
+  const l = cur(); if (!l || l.type !== 'text') return;
+  if (mq.matches) setTab('props');
+  const ta = $('#textEdit'); if (ta) { ta.focus(); ta.select(); }
+});
+$('#stage').addEventListener('pointerdown', e => { if (e.target === $('#stage') && !exporting) { if (playing) pause(); animPreview = false; select(null); } });
+cv.addEventListener('wheel', e => {
+  const l = cur(); if (!l || l.locked || !(e.ctrlKey || e.altKey)) return;
+  e.preventDefault(); const f = Math.exp(-e.deltaY * .002);
+  if (l.type === 'text') l.size = clamp(l.size * f, 6, 2000); else { l.w *= f; l.h *= f; }
+  requestDraw(); clearTimeout(changedTimer); changedTimer = setTimeout(() => { commit(); renderProps(); }, 300);
+}, { passive: false });
+
+/* drag & drop, paste */
+const stageEl = $('#stage');
+stageEl.addEventListener('dragover', e => { e.preventDefault(); stageEl.classList.add('drop'); });
+stageEl.addEventListener('dragleave', e => { if (e.target === stageEl) stageEl.classList.remove('drop'); });
+stageEl.addEventListener('drop', e => { e.preventDefault(); stageEl.classList.remove('drop'); if (e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]); });
+document.addEventListener('paste', e => {
+  const files = [...(e.clipboardData && e.clipboardData.items) || []].filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean);
+  if (files.length) { e.preventDefault(); addFiles(files); }
+});
+
+/* keyboard */
+let nudgeTimer = 0;
+addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,textarea,select')) return;
+  if (!$('#exportModal').hidden) { if (e.key === 'Escape') closeExport(); return; }
+  const l = cur(), mod = e.ctrlKey || e.metaKey;
+  if (mod && e.code === 'KeyZ') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  else if (mod && e.code === 'KeyY') { e.preventDefault(); redo(); }
+  else if (mod && e.code === 'KeyD') { e.preventDefault(); duplicate(); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && l) { e.preventDefault(); removeSel(); }
+  else if (e.key.startsWith('Arrow') && l && !l.locked) {
+    e.preventDefault(); const d = e.shiftKey ? 10 : 1;
+    if (e.key === 'ArrowLeft') l.x -= d; if (e.key === 'ArrowRight') l.x += d; if (e.key === 'ArrowUp') l.y -= d; if (e.key === 'ArrowDown') l.y += d;
+    requestDraw(); clearTimeout(nudgeTimer); nudgeTimer = setTimeout(commit, 400);
+  }
+  else if (e.code === 'Space' && !e.target.closest('button')) { e.preventDefault(); playing ? pause() : play(); }
+  else if (e.key === 'Escape') select(null);
+});
+
+/* ---------- toast ---------- */
+let toastTimer = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.removeAttribute('data-hide'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.setAttribute('data-hide', ''), 2800); }
+
+/* ---------- export modal wiring ---------- */
+$('#exportBtn').append(icon('download'), h('span', {}, 'تصدير'));
+$('#undoBtn').append(icon('undo')); $('#redoBtn').append(icon('redo')); $('#exClose').append(icon('close'));
+$('#undoBtn').addEventListener('click', undo); $('#redoBtn').addEventListener('click', redo);
+$('#exportBtn').addEventListener('click', openExport);
+$('#exClose').addEventListener('click', closeExport);
+$('#exportModal').addEventListener('click', e => { if (e.target.id === 'exportModal') closeExport(); });
+document.querySelectorAll('.exopt').forEach(b => {
+  b.prepend(icon(b.dataset.fmt === 'video' ? 'video' : 'image'));
+  b.addEventListener('click', () => { if (b.dataset.fmt === 'video') exportVideo(); else exportImage(b.dataset.fmt); });
+});
+const exs = { s: 1 };
+$('#exScale').replaceWith(ctlSeg(null, exs, 's', [[1, 'أصلية'], [2, 'مضاعفة ×2']], () => { exScale = exs.s; }).querySelector('.seg'));
+$('#exCancel').addEventListener('click', () => { exCancelled = true; onPlayEnd = null; if (playing) pause(); if (rec && rec.state !== 'inactive') rec.stop(); });
+
+/* ---------- boot ---------- */
+function renderAll() { renderRail(); renderTools(); renderProps(); renderTracks(); updateTime(); updateUndo(); requestDraw(); }
+mq.addEventListener('change', () => { if (!mq.matches && tab === 'props') tab = 'templates'; $('#app').classList.toggle('show-props', tab === 'props'); renderRail(); renderTools(); fitCanvas(); });
+updatePlayBtn();
+loadDoc(TEMPLATES[0].make()); commit();
+if (document.fonts) {
+  Promise.all(FONTS.map(([f]) => document.fonts.load(`700 40px "${f}"`, f === 'Playfair Display' ? 'Ab' : 'أبجد').catch(() => {}))).then(() => { requestDraw(); if (tab === 'templates') renderTools(); });
+  document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', requestDraw);
+}
+store.load().then(ok => { if (ok) { hist = []; hi = -1; commit(); toast('استعدنا آخر تصميم عملت عليه.'); } })
+  .catch(() => {}).finally(() => { booted = true; store.saveSoon(); });
+</script>
+</body>
+</html>
