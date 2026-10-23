@@ -1198,11 +1198,30 @@ const AI_STYLES = [
   ['flat', 'رسم مسطح', 'flat vector illustration, minimal clean shapes, modern palette'],
 ];
 const AI_IDEAS = ['فانوس رمضان ذهبي في ليلة مقمرة', 'مسجد عند الغروب بإضاءة سينمائية', 'زجاجة عطر فاخرة على رخام أسود', 'صحراء وجمال تحت سماء مليئة بالنجوم', 'فنجان قهوة عربية ودلّة على طاولة خشبية'];
-const AI = { prompt: '', style: 'photo', engine: inClaude ? 'claude' : 'flux', count: 1, busy: false, status: '', ctl: null, results: [], key: '' };
-try { AI.key = localStorage.getItem('lamsa-ai-key') || ''; } catch (e) {}
+const AI = { mode: 'single', prompt: '', batch: '', perPrompt: 4, story: '', scenes: 5, sceneSec: 4, captions: true,
+  style: 'photo', engine: inClaude ? 'claude' : 'flux', count: 1, busy: false, status: '', done: 0, total: 0, ctl: null, results: [], key: '', hf: '' };
+try { AI.key = localStorage.getItem('lamsa-ai-key') || ''; AI.hf = localStorage.getItem('lamsa-hf-key') || ''; } catch (e) {}
+const MAX_BATCH = 200;
 function aiSize() {
   const k = 1024 / Math.max(S.w, S.h);
   return [Math.max(256, Math.round(S.w * k / 64) * 64), Math.max(256, Math.round(S.h * k / 64) * 64)];
+}
+const sleep = (ms, signal) => new Promise((res, rej) => {
+  const t = setTimeout(res, ms);
+  signal && signal.addEventListener('abort', () => { clearTimeout(t); rej({ code: 'cancelled' }); }, { once: true });
+});
+/* Retries a provider call when the free service is busy (429/5xx) or the network drops. */
+async function withRetry(fn, signal) {
+  let wait = 6000;
+  for (let i = 0; ; i++) {
+    try { return await fn(); }
+    catch (e) {
+      const busy = e && (e.status === 429 || e.status >= 500 || e.status === 503 || e instanceof TypeError);
+      if (!busy || i >= 5 || (signal && signal.aborted)) throw e;
+      AI.status = `الخدمة مشغولة، إعادة المحاولة بعد ${Math.round(wait / 1000)} ث…`; updateAIStatus();
+      await sleep(wait, signal); wait = Math.min(60000, wait * 2);
+    }
+  }
 }
 async function genFlux(prompt, style, w, hh, seed, signal) {
   let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt + ', ' + style)}?width=${w}&height=${hh}&seed=${seed}&model=flux&nologo=true&enhance=true&safe=true`;
@@ -1210,7 +1229,33 @@ async function genFlux(prompt, style, w, hh, seed, signal) {
   const r = await fetch(url, { signal });
   if (!r.ok) throw { code: 'http', status: r.status };
   const b = await r.blob();
-  if (!b.type.startsWith('image/')) throw { code: 'http' };
+  if (!b.type.startsWith('image/')) throw { code: 'http', status: 502 };
+  return b;
+}
+const trCache = new Map();
+/* FLUX on Hugging Face understands English only, so Arabic prompts are translated first. */
+async function toEnglish(text, signal) {
+  if (!isAr(text)) return text;
+  if (trCache.has(text)) return trCache.get(text);
+  const ask = 'Translate this image description into fluent, vivid English for an image generator. Output only the translation.\n\n' + text;
+  let out = '';
+  try {
+    if (aiSample) out = (await aiSample(ask, { modelTier: 'quick', signal })).text;
+    else { const r = await fetch('https://text.pollinations.ai/' + encodeURIComponent(ask), { signal }); if (r.ok) out = await r.text(); }
+  } catch (e) { if (e && e.code === 'cancelled') throw e; }
+  out = (out || '').trim();
+  if (!out || isAr(out)) throw { code: 'translate' };
+  trCache.set(text, out); return out;
+}
+async function genHF(prompt, style, w, hh, seed, signal) {
+  if (!AI.hf) throw { code: 'hf_key' };
+  const en = await toEnglish(prompt, signal);
+  const r = await fetch('https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell', {
+    method: 'POST', signal, headers: { Authorization: 'Bearer ' + AI.hf, 'Content-Type': 'application/json', Accept: 'image/png' },
+    body: JSON.stringify({ inputs: en + ', ' + style, parameters: { width: w, height: hh, seed: seed % 2147483647, num_inference_steps: 4 } }) });
+  if (!r.ok) throw { code: 'http', status: r.status, hf: true };
+  const b = await r.blob();
+  if (!b.type.startsWith('image/')) throw { code: 'http', status: 502 };
   return b;
 }
 function cleanSvg(text, w, hh) {
@@ -1240,7 +1285,7 @@ async function svgToPng(svg, w, hh) {
     return png || svgBlob;
   } catch (e) { return svgBlob; } finally { URL.revokeObjectURL(url); }
 }
-async function genClaude(prompt, style, w, hh, signal, onLen) {
+async function genClaude(prompt, style, w, hh, signal) {
   const ask = `You are a world-class illustrator who paints with SVG. Create ONE finished, gallery-quality illustration.
 Subject (the user may write in Arabic): ${prompt}
 Style: ${style}
@@ -1252,77 +1297,202 @@ Rules:
 - No text or letters unless the subject explicitly asks for words.
 - No <script>, no <foreignObject>, no external images, fonts or links.
 Output only the SVG markup, starting with <svg and ending with </svg>. No explanation and no code fence.`;
-  const { text } = await aiSample(ask, { signal, modelTier: 'default', cache: false, onText: ({ text }) => onLen(text.length) });
-  const svg = cleanSvg(text, w, hh);
-  return svgToPng(svg, w, hh);
+  const base = AI.status;
+  const { text } = await aiSample(ask, { signal, modelTier: 'default', cache: false, onText: ({ text }) => { AI.status = `${base} · ${(text.length / 1000).toFixed(1)} ألف حرف`; updateAIStatus(); } });
+  return svgToPng(cleanSvg(text, w, hh), w, hh);
+}
+function genImage(prompt, signal) {
+  const st = AI_STYLES.find(x => x[0] === AI.style)[2], [w, hh] = aiSize(), seed = Math.floor(Math.random() * 1e9);
+  if (AI.engine === 'claude') return genClaude(prompt, st, w, hh, signal);
+  if (AI.engine === 'hf') return withRetry(() => genHF(prompt, st, w, hh, seed, signal), signal);
+  return withRetry(() => genFlux(prompt, st, w, hh, seed, signal), signal);
 }
 function aiErr(e) {
   const c = e && e.code;
   if (c === 'cancelled' || (e && e.name === 'AbortError')) return 'أُوقف التوليد.';
+  if (c === 'hf_key') return 'أدخل مفتاح Hugging Face أولًا في قسم المحرّك.';
+  if (c === 'translate') return 'تعذّرت ترجمة الوصف العربي. اكتبه بالإنجليزية أو استخدم محرك Pollinations.';
   if (c === 'not_granted') return 'لم تسمح للصفحة باستخدام Claude. أعد المحاولة واضغط سماح.';
-  if (c === 'rate_limited' || c === 'queue_overflow' || (c === 'http' && e.status === 429)) return 'طلبات كثيرة في وقت قصير. انتظر دقيقة ثم أعد المحاولة.';
+  if (e && e.hf && (e.status === 401 || e.status === 403)) return 'مفتاح Hugging Face غير صحيح أو بلا صلاحية Inference.';
+  if (e && e.hf && e.status === 402) return 'انتهى رصيدك المجاني في Hugging Face لهذا الشهر. استخدم محرك Pollinations.';
+  if (c === 'rate_limited' || c === 'queue_overflow' || (e && e.status === 429)) return 'وصلت لحد السرعة في الخدمة. انتظر قليلًا ثم أكمل.';
   if (c === 'refused') return 'لا يمكن توليد هذا الوصف. جرّب وصفًا آخر.';
-  if (c === 'bad_svg' || c === 'empty_completion') return 'خرجت الصورة ناقصة. اضغط توليد مرة أخرى.';
-  if (c === 'http' || (e instanceof TypeError)) return 'تعذّر الوصول إلى خدمة الصور المجانية. تحقق من الإنترنت أو جرّب بعد قليل.';
+  if (c === 'bad_svg' || c === 'empty_completion') return 'خرجت الصورة ناقصة. أعد المحاولة.';
+  if (c === 'http' || (e instanceof TypeError)) return 'تعذّر الوصول إلى خدمة الصور. تحقق من الإنترنت أو جرّب بعد قليل.';
   return 'تعذّر التوليد. حاول مرة أخرى.';
 }
-async function aiGenerate() {
-  const prompt = AI.prompt.trim();
-  if (!prompt) { toast('اكتب وصف الصورة أولًا.'); $('#aiPrompt') && $('#aiPrompt').focus(); return; }
-  if (AI.busy) return;
-  const st = AI_STYLES.find(x => x[0] === AI.style)[2], [w, hh] = aiSize();
-  AI.busy = true; AI.ctl = new AbortController(); renderTools();
-  const n = AI.engine === 'flux' ? AI.count : 1;
-  let made = 0;
+function addResult(blob, prompt) {
+  const r = { id: uid(), blob, url: URL.createObjectURL(blob), prompt, mediaId: null };
+  AI.results.unshift(r);
+  if (tab === 'ai') renderAIResults();
+  return r;
+}
+async function resultMedia(r) {
+  if (r.mediaId && media.has(r.mediaId)) return media.get(r.mediaId);
+  const m = await makeMedia('image', r.blob, r.prompt.slice(0, 40)); r.mediaId = m.id; return m;
+}
+/* Runs a list of image jobs one after another; a failed job is skipped so a long batch keeps going. */
+async function runJobs(prompts, label) {
+  AI.busy = true; AI.ctl = new AbortController(); AI.done = 0; AI.total = prompts.length; renderTools();
+  const out = []; let fails = 0, lastErr = null;
   try {
-    for (let i = 0; i < n; i++) {
-      AI.status = AI.engine === 'flux' ? `يرسم الصورة ${i + 1} من ${n}…` : 'Claude يفكّر في التكوين…'; updateAIStatus();
-      const blob = AI.engine === 'flux'
-        ? await genFlux(prompt, st, w, hh, Math.floor(Math.random() * 1e9), AI.ctl.signal)
-        : await genClaude(prompt, st, w, hh, AI.ctl.signal, len => { AI.status = `Claude يرسم… ${(len / 1000).toFixed(1)} ألف حرف`; updateAIStatus(); });
-      const m = await makeMedia('image', blob, prompt.slice(0, 40));
-      AI.results.unshift({ id: m.id, prompt }); made++;
-      if (tab === 'ai') renderTools();
+    for (const p of prompts) {
+      AI.status = `${label} ${AI.done + 1} من ${AI.total}`; updateAIStatus();
+      try { const blob = await genImage(p, AI.ctl.signal); out.push(addResult(blob, p)); }
+      catch (e) {
+        if (e && (e.code === 'cancelled' || e.name === 'AbortError')) throw e;
+        if (e && (e.code === 'hf_key' || e.code === 'not_granted' || (e.hf && [401, 402, 403].includes(e.status)))) throw e;
+        fails++; lastErr = e;
+      }
+      AI.done++; updateAIStatus();
     }
-    toast(made > 1 ? `جهزت ${made} صور. اضغط «إضافة» لوضعها في التصميم.` : 'جهزت الصورة. اضغط «إضافة» لوضعها في التصميم.');
   } catch (e) { toast(aiErr(e)); }
   finally { AI.busy = false; AI.ctl = null; AI.status = ''; if (tab === 'ai') renderTools(); }
+  if (fails) toast(`تعذّر توليد ${fails} من ${prompts.length}. ${aiErr(lastErr)}`);
+  return out;
 }
-function updateAIStatus() { const el = $('#aiStatus'); if (el) el.textContent = AI.status; }
+async function aiGenerate() {
+  if (AI.busy) return;
+  if (AI.mode === 'single') {
+    const p = AI.prompt.trim(); if (!p) return needText('#aiPrompt');
+    const n = AI.engine === 'claude' ? 1 : AI.count;
+    const out = await runJobs(Array(n).fill(p), 'يرسم الصورة');
+    if (out.length) toast(`جهزت ${out.length} صورة. اضغط «إضافة» لوضعها في التصميم.`);
+  } else if (AI.mode === 'batch') {
+    const lines = AI.batch.split('\n').map(s => s.trim()).filter(Boolean); if (!lines.length) return needText('#aiBatch');
+    const jobs = []; for (const l of lines) for (let i = 0; i < AI.perPrompt; i++) jobs.push(l);
+    const out = await runJobs(jobs.slice(0, MAX_BATCH), 'صورة');
+    if (out.length) toast(`اكتملت الدفعة: ${out.length} صورة. نزّلها كلها بملف ZIP.`);
+  } else await makeStoryVideo();
+}
+function needText(sel) { toast('اكتب الوصف أولًا.'); const el = $(sel); el && el.focus(); }
+
+/* ---- text to video: scenes -> images -> animated slideshow with captions ---- */
+async function planScenes(story, n, signal) {
+  const ask = `Split this video idea into exactly ${n} consecutive scenes for a short vertical social video.
+Idea (may be Arabic): ${story}
+Return only a JSON array of ${n} objects: [{"caption": "short Arabic caption, max 8 words", "prompt": "detailed English image prompt for this scene, same characters and setting across scenes"}]`;
+  let text = '';
+  try {
+    if (aiSample) text = (await aiSample(ask, { modelTier: 'default', signal })).text;
+    else { const r = await fetch('https://text.pollinations.ai/' + encodeURIComponent(ask), { signal }); if (r.ok) text = await r.text(); }
+    const m = text.match(/\[[\s\S]*\]/);
+    const arr = m ? JSON.parse(m[0]) : null;
+    if (Array.isArray(arr) && arr.length) return arr.slice(0, n).map(s => ({ caption: String(s.caption || ''), prompt: String(s.prompt || s.caption || story) }));
+  } catch (e) { if (e && e.code === 'cancelled') throw e; }
+  // Fallback without a writer: each sentence of the idea becomes a scene.
+  const parts = story.split(/[\n.!؟?،]+/).map(s => s.trim()).filter(Boolean);
+  const src = parts.length ? parts : [story];
+  return Array.from({ length: Math.min(n, Math.max(src.length, 1)) }, (_, i) => ({ caption: src[i % src.length], prompt: src[i % src.length] + ', ' + story }));
+}
+async function makeStoryVideo() {
+  const story = AI.story.trim(); if (!story) return needText('#aiStory');
+  AI.busy = true; AI.ctl = new AbortController(); AI.done = 0; AI.total = AI.scenes; AI.status = 'يكتب المشاهد…'; renderTools();
+  let scenes;
+  try { scenes = await planScenes(story, AI.scenes, AI.ctl.signal); }
+  catch (e) { AI.busy = false; renderTools(); toast(aiErr(e)); return; }
+  AI.busy = false;
+  const out = await runJobs(scenes.map(s => s.prompt), 'يرسم المشهد');
+  if (!out.length) return;
+  const caps = out.map(r => (scenes.find(s => s.prompt === r.prompt) || {}).caption || '');
+  const ms = []; for (const r of out) ms.push(await resultMedia(r));
+  const per = AI.sceneSec, D = newDoc(S.w, S.h, { type: 'solid', c1: '#000000', vignette: 30, grain: 6 });
+  D.duration = Math.min(600, ms.length * per);
+  D.layers = ms.map((m, i) => mkMedia(D, 'image', m, { w: D.w, h: D.h,
+    anim: { in: 'fade', dur: .8, start: i * per, end: i < ms.length - 1 ? (i + 1) * per + .8 : null, loop: 'kenburns' } }));
+  if (AI.captions) caps.forEach((c, i) => { if (c) D.layers.push(mkText(D, { text: c, font: 'Tajawal', size: Math.round(D.w * .05), y: D.h * .84,
+    box: { on: true, color: '#000000', alpha: .55, pad: Math.round(D.w * .02), radius: 14 },
+    anim: { in: 'up', out: 'fade', dur: .6, start: i * per + .4, end: Math.min(D.duration, (i + 1) * per - .1) } })); });
+  sel = null; T = 0; animPreview = true; loadDoc(D); commit();
+  toast(`الفيديو جاهز: ${ms.length} مشاهد. اضغط تشغيل للمعاينة أو تصدير لحفظه MP4.`);
+}
+
+let jszipP = null;
+function loadJSZip() {
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  return jszipP || (jszipP = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = () => res(window.JSZip); s.onerror = () => { jszipP = null; rej(new Error('jszip')); }; document.head.append(s);
+  }));
+}
+async function downloadAllZip() {
+  if (!AI.results.length) return;
+  toast('يجهّز ملف ZIP…');
+  try {
+    const Z = await loadJSZip(), zip = new Z();
+    [...AI.results].reverse().forEach((r, i) => zip.file(`lamsa-ai-${String(i + 1).padStart(3, '0')}.${r.blob.type.includes('png') ? 'png' : 'jpg'}`, r.blob));
+    zip.file('prompts.txt', [...AI.results].reverse().map((r, i) => `${i + 1}. ${r.prompt}`).join('\n'));
+    await saveFile(await zip.generateAsync({ type: 'blob' }), `lamsa-ai-${stamp()}.zip`);
+  } catch (e) { toast('تعذّر تجهيز ملف ZIP.'); }
+}
+function updateAIStatus() {
+  const el = $('#aiStatus'); if (el) el.textContent = AI.status;
+  const bar = $('#aiBar'); if (bar) bar.style.width = (AI.total ? AI.done / AI.total * 100 : 0) + '%';
+}
+function renderAIResults() {
+  const box = $('#aiResults'); if (!box) return;
+  const shown = AI.results.slice(0, 60);
+  box.replaceChildren(...(AI.results.length ? [
+    h('div', { class: 'row2' },
+      h('button', { class: 'btn', onclick: downloadAllZip }, icon('download'), `تنزيل الكل (${AI.results.length}) ZIP`),
+      h('button', { class: 'btn danger', onclick: () => { AI.results.forEach(r => { if (!r.mediaId) URL.revokeObjectURL(r.url); }); AI.results = []; renderAIResults(); } }, icon('trash'), 'مسح النتائج')),
+    AI.results.length > shown.length ? h('p', { class: 'hint' }, `تظهر آخر ${shown.length} صورة، وملف ZIP يضم الكل.`) : null,
+    h('div', { class: 'grid2' }, shown.map(r => h('div', { class: 'ai-res' }, h('img', { src: r.url, alt: r.prompt, title: r.prompt, loading: 'lazy' }),
+      h('div', { class: 'row2' },
+        h('button', { class: 'btn', onclick: async () => addMediaLayer(await resultMedia(r)) }, 'إضافة'),
+        h('button', { class: 'btn', onclick: async () => { const m = await resultMedia(r); S.bg.type = 'image'; S.bg.mediaId = m.id; commit(); requestDraw(); toast('أصبحت الصورة خلفية التصميم.'); } }, 'خلفية'))))),
+  ] : [h('p', { class: 'hint' }, 'ستظهر الصور المولّدة هنا.')]).filter(Boolean));
+}
+function keyInput(label, key, store_, ph) {
+  const k = h('input', { type: 'text', value: AI[key], dir: 'ltr', placeholder: ph, 'aria-label': label, autocomplete: 'off', spellcheck: 'false' });
+  k.addEventListener('change', () => { AI[key] = k.value.trim(); try { localStorage.setItem(store_, AI[key]); } catch (e) {} renderTools(); });
+  return h('div', { class: 'ctl' }, label ? h('label', {}, h('span', {}, label)) : null, k);
+}
 function renderAI(add) {
-  const claudeOk = !!aiSample, fluxOk = !inClaude;
-  if (AI.engine === 'claude' && !claudeOk && fluxOk) AI.engine = 'flux';
-  if (AI.engine === 'flux' && !fluxOk) AI.engine = 'claude';
-  add(h('h2', { class: 'ptitle' }, 'التوليد بالذكاء الاصطناعي'), h('p', { class: 'psub' }, 'اكتب ما تتخيله بالعربية أو الإنجليزية، وتظهر الصورة جاهزة للإضافة إلى تصميمك.'));
-  const ta = h('textarea', { id: 'aiPrompt', dir: 'auto', rows: 4, value: AI.prompt, placeholder: 'مثال: فانوس رمضان ذهبي معلق فوق شارع قديم في القاهرة ليلًا', 'aria-label': 'وصف الصورة' });
-  ta.addEventListener('input', () => { AI.prompt = ta.value; });
-  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) aiGenerate(); });
-  add(sec('الوصف', ta, h('div', { class: 'chips' }, AI_IDEAS.map(t => h('button', { type: 'button', onclick: () => { AI.prompt = t; ta.value = t; } }, t)))));
-  add(sec('الأسلوب', ctlSeg(null, AI, 'style', AI_STYLES.map(([k, n]) => [k, n]))));
+  const claudeOk = !!aiSample, webOk = !inClaude;
   const engines = [];
-  if (fluxOk) engines.push(['flux', 'صور واقعية · Flux']);
+  if (webOk) engines.push(['flux', 'Pollinations · مجاني'], ['hf', 'Hugging Face · بمفتاحك']);
   if (claudeOk) engines.push(['claude', 'رسم فني · Claude']);
+  if (!engines.some(e => e[0] === AI.engine) && engines.length) AI.engine = engines[0][0];
+  add(h('h2', { class: 'ptitle' }, 'استوديو الذكاء الاصطناعي'), h('p', { class: 'psub' }, 'صورة واحدة، أو دفعة كبيرة من الصور، أو فيديو كامل من فكرة مكتوبة.'));
+  add(sec(null, ctlSeg(null, AI, 'mode', [['single', 'صورة'], ['batch', 'دفعة صور'], ['video', 'فيديو من نص']], () => renderTools())));
+  if (AI.mode === 'single') {
+    const ta = h('textarea', { id: 'aiPrompt', dir: 'auto', rows: 4, value: AI.prompt, placeholder: 'مثال: فانوس رمضان ذهبي معلق فوق شارع قديم في القاهرة ليلًا', 'aria-label': 'وصف الصورة' });
+    ta.addEventListener('input', () => { AI.prompt = ta.value; });
+    ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) aiGenerate(); });
+    add(sec('الوصف', ta, h('div', { class: 'chips' }, AI_IDEAS.map(t => h('button', { type: 'button', onclick: () => { AI.prompt = t; ta.value = t; } }, t)))));
+  } else if (AI.mode === 'batch') {
+    const ta = h('textarea', { id: 'aiBatch', dir: 'auto', rows: 6, value: AI.batch, placeholder: 'وصف في كل سطر، مثال:\nفانوس ذهبي على نافذة خشبية\nهلال فوق مسجد أبيض\nتمر وقهوة عربية على صينية نحاس', 'aria-label': 'قائمة الأوصاف' });
+    ta.addEventListener('input', () => { AI.batch = ta.value; });
+    add(sec('الأوصاف', h('p', { class: 'hint' }, 'اكتب كل وصف في سطر. يُولَّد العدد المطلوب من كل وصف بتنويعات مختلفة، حتى 200 صورة في الدفعة الواحدة، ويمكنك تشغيل دفعات متتالية.'),
+      ta, ctlRange('صور لكل وصف', AI, 'perPrompt', 1, 50, 1)));
+  } else {
+    const ta = h('textarea', { id: 'aiStory', dir: 'auto', rows: 5, value: AI.story, placeholder: 'مثال: رحلة قافلة عبر الصحراء من الفجر حتى تصل إلى واحة عند الغروب', 'aria-label': 'فكرة الفيديو' });
+    ta.addEventListener('input', () => { AI.story = ta.value; });
+    add(sec('فكرة الفيديو', h('p', { class: 'hint' }, 'يقسّم الذكاء الاصطناعي الفكرة إلى مشاهد، ويرسم صورة لكل مشهد، ثم يحرّكها بزووم سينمائي وانتقالات وتعليق عربي. أضف موسيقى من تبويب الوسائط ثم صدّر MP4.'),
+      ta, ctlRange('عدد المشاهد', AI, 'scenes', 2, 20, 1), ctlRange('مدة كل مشهد', AI, 'sceneSec', 2, 10, .5, sec1), ctlToggle('تعليق مكتوب على كل مشهد', AI, 'captions')));
+  }
+  add(sec('الأسلوب', ctlSeg(null, AI, 'style', AI_STYLES.map(([k, n]) => [k, n]))));
   add(sec('المحرّك',
     engines.length > 1 ? ctlSeg(null, AI, 'engine', engines, () => renderTools()) : null,
-    AI.engine === 'flux' && fluxOk ? [
-      h('p', { class: 'hint' }, 'محرك Flux المجاني عبر خدمة Pollinations. يرسم صورًا واقعية بجودة عالية، ويحتاج اتصالًا بالإنترنت.'),
-      ctlSeg('عدد الصور', AI, 'count', [[1, '1'], [2, '2'], [4, '4']]),
-      h('details', {}, h('summary', { class: 'hint', style: 'cursor:pointer' }, 'مفتاح Pollinations (اختياري، لسرعة أعلى)'),
-        (() => { const k = h('input', { type: 'text', value: AI.key, dir: 'ltr', placeholder: 'اتركه فارغًا للاستخدام المجاني', 'aria-label': 'مفتاح Pollinations' });
-          k.addEventListener('change', () => { AI.key = k.value.trim(); try { localStorage.setItem('lamsa-ai-key', AI.key); } catch (e) {} }); return k; })()),
-    ] : null,
-    AI.engine === 'claude' && claudeOk ? h('p', { class: 'hint' }, 'Claude يرسم لوحة فنية متجهية مفصّلة بالتدرّجات والظلال. أنسب للرسوم والشعارات والخلفيات الزخرفية منه للصور الفوتوغرافية. يستغرق عادة بين نصف دقيقة ودقيقتين.') : null,
+    AI.engine === 'flux' ? [h('p', { class: 'hint' }, 'نموذج Flux عبر خدمة Pollinations المجانية، بلا تسجيل. الخدمة تحدّ من سرعة الطلبات، والبرنامج يعيد المحاولة تلقائيًا عند الانشغال.'),
+      h('details', {}, h('summary', { class: 'hint', style: 'cursor:pointer' }, 'مفتاح Pollinations (اختياري، لسرعة أعلى)'), keyInput(null, 'key', 'lamsa-ai-key', 'اتركه فارغًا للاستخدام المجاني'))] : null,
+    AI.engine === 'hf' ? [h('p', { class: 'hint' }, 'FLUX.1-schnell على Hugging Face بمفتاحك. الحساب المجاني له رصيد شهري صغير، والاشتراك المدفوع يرفعه. الوصف العربي يُترجم تلقائيًا.'),
+      keyInput('مفتاح Hugging Face', 'hf', 'lamsa-hf-key', 'hf_...'),
+      h('p', { class: 'hint' }, 'يُحفظ المفتاح في متصفحك فقط ويُرسل إلى Hugging Face وحدها.')] : null,
+    AI.engine === 'claude' ? h('p', { class: 'hint' }, 'Claude يرسم لوحة فنية متجهية مفصّلة. أنسب للرسوم والشعارات والخلفيات الزخرفية منه للصور الفوتوغرافية، ويستغرق نصف دقيقة إلى دقيقتين للصورة.') : null,
     !engines.length ? h('p', { class: 'note' }, 'جارِ تجهيز محرك الذكاء الاصطناعي…') : null,
-    inClaude ? h('p', { class: 'note' }, 'للصور الواقعية بمحرك Flux افتح النسخة العامة من البرنامج: ', h('a', { href: PUBLIC_URL, target: '_blank', rel: 'noopener', style: 'color:var(--gold)' }, 'فتح النسخة العامة')) : null));
-  add(sec(null, AI.busy
-    ? [h('div', { class: 'note busy' }, h('i'), h('span', { id: 'aiStatus' }, AI.status || 'جارِ التوليد…')), h('button', { class: 'btn block', onclick: () => AI.ctl && AI.ctl.abort() }, 'إيقاف')]
-    : h('button', { class: 'btn gold block', disabled: !engines.length, onclick: aiGenerate }, icon('ai'), `توليد بمقاس ${dim(...aiSize())}`)));
-  const res = AI.results.filter(r => media.has(r.id));
-  if (res.length) add(sec('النتائج', h('div', { class: 'grid2' }, res.map(r => { const m = media.get(r.id);
-    return h('div', { class: 'ai-res' }, h('img', { src: m.url, alt: r.prompt, title: r.prompt }),
-      h('div', { class: 'row2' },
-        h('button', { class: 'btn', onclick: () => addMediaLayer(m) }, 'إضافة'),
-        h('button', { class: 'btn', onclick: () => { S.bg.type = 'image'; S.bg.mediaId = m.id; commit(); requestDraw(); toast('أصبحت الصورة خلفية التصميم.'); } }, 'خلفية'))); }))));
+    inClaude ? h('p', { class: 'note' }, 'للصور الواقعية ودفعات الصور الكبيرة افتح النسخة العامة من البرنامج: ', h('a', { href: PUBLIC_URL, target: '_blank', rel: 'noopener', style: 'color:var(--gold)' }, 'فتح النسخة العامة')) : null));
+  const nJobs = AI.mode === 'single' ? (AI.engine === 'claude' ? 1 : AI.count) : AI.mode === 'batch' ? Math.min(MAX_BATCH, AI.batch.split('\n').filter(s => s.trim()).length * AI.perPrompt) : AI.scenes;
+  add(sec(null,
+    AI.mode === 'single' && AI.engine !== 'claude' ? ctlSeg('عدد الصور', AI, 'count', [[1, '1'], [2, '2'], [4, '4'], [8, '8']]) : null,
+    AI.busy
+      ? [h('div', { class: 'note busy' }, h('i'), h('span', { id: 'aiStatus' }, AI.status || 'جارِ التوليد…')), h('div', { class: 'progress' }, h('i', { id: 'aiBar' })),
+         h('button', { class: 'btn block', onclick: () => AI.ctl && AI.ctl.abort() }, 'إيقاف')]
+      : h('button', { class: 'btn gold block', disabled: !engines.length, onclick: aiGenerate }, icon('ai'),
+          AI.mode === 'video' ? 'صنع الفيديو' : AI.mode === 'batch' ? `توليد الدفعة${nJobs ? ` (${nJobs})` : ''}` : `توليد بمقاس ${dim(...aiSize())}`)));
+  add(sec('النتائج', h('div', { id: 'aiResults', class: 'ctl' })));
+  setTimeout(() => { renderAIResults(); updateAIStatus(); });
 }
 
 /* ---------- UI: properties panel ---------- */
