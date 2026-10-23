@@ -1444,7 +1444,7 @@ function renderAIResults() {
   ] : [h('p', { class: 'hint' }, 'ستظهر الصور المولّدة هنا.')]).filter(Boolean));
 }
 function keyInput(label, key, store_, ph) {
-  const k = h('input', { type: 'text', value: AI[key], dir: 'ltr', placeholder: ph, 'aria-label': label, autocomplete: 'off', spellcheck: 'false' });
+  const k = h('input', { type: 'password', value: AI[key], dir: 'ltr', placeholder: ph, 'aria-label': label, autocomplete: 'off', spellcheck: 'false' });
   k.addEventListener('change', () => { AI[key] = k.value.trim(); try { localStorage.setItem(store_, AI[key]); } catch (e) {} renderTools(); });
   return h('div', { class: 'ctl' }, label ? h('label', {}, h('span', {}, label)) : null, k);
 }
@@ -1455,7 +1455,8 @@ function renderAI(add) {
   if (claudeOk) engines.push(['claude', 'رسم فني · Claude']);
   if (!engines.some(e => e[0] === AI.engine) && engines.length) AI.engine = engines[0][0];
   add(h('h2', { class: 'ptitle' }, 'استوديو الذكاء الاصطناعي'), h('p', { class: 'psub' }, 'صورة واحدة، أو دفعة كبيرة من الصور، أو فيديو كامل من فكرة مكتوبة.'));
-  add(sec(null, ctlSeg(null, AI, 'mode', [['single', 'صورة'], ['batch', 'دفعة صور'], ['video', 'فيديو من نص']], () => renderTools())));
+  add(sec(null, ctlSeg(null, AI, 'mode', [['single', 'صورة'], ['batch', 'دفعة صور'], ['video', 'فيديو من نص'], ['motion', 'فيديو متحرك']], () => renderTools())));
+  if (AI.mode === 'motion') { renderMotion(add); return; }
   if (AI.mode === 'single') {
     const ta = h('textarea', { id: 'aiPrompt', dir: 'auto', rows: 4, value: AI.prompt, placeholder: 'مثال: فانوس رمضان ذهبي معلق فوق شارع قديم في القاهرة ليلًا', 'aria-label': 'وصف الصورة' });
     ta.addEventListener('input', () => { AI.prompt = ta.value; });
@@ -1493,6 +1494,181 @@ function renderAI(add) {
           AI.mode === 'video' ? 'صنع الفيديو' : AI.mode === 'batch' ? `توليد الدفعة${nJobs ? ` (${nJobs})` : ''}` : `توليد بمقاس ${dim(...aiSize())}`)));
   add(sec('النتائج', h('div', { id: 'aiResults', class: 'ctl' })));
   setTimeout(() => { renderAIResults(); updateAIStatus(); });
+}
+
+
+/* ---- motion video (Magic Hour / Hugging Face) and AI image editing ---- */
+const HF_JS = 'https://cdn.jsdelivr.net/npm/@huggingface/inference@4.13.29/+esm';
+let hfP = null;
+const loadHF = () => hfP || (hfP = import(HF_JS).catch(() => { hfP = null; throw { code: 'lib' }; }));
+const MH_MODELS = [['ltx-2.3', 'LTX 2.3 · الأوفر'], ['wan-2.2', 'Wan 2.2'], ['seedance-2.0-fast', 'Seedance 2 سريع'], ['kling-2.6', 'Kling 2.6'], ['veo3.1-lite', 'Veo 3.1 Lite'], ['sora-2', 'Sora 2']];
+const HF_VIDEO_TEXT = ['Wan-AI/Wan2.2-TI2V-5B', 'Lightricks/LTX-Video-0.9.8-13B-distilled', 'Wan-AI/Wan2.2-T2V-A14B', 'tencent/HunyuanVideo'];
+const HF_VIDEO_IMAGE = ['Wan-AI/Wan2.2-I2V-A14B', 'Lightricks/LTX-Video-0.9.8-13B-distilled'];
+const MV = { prompt: '', dur: 5, model: 'ltx-2.3', res: '480p', src: 'none', srcBlob: null, srcUrl: null, provider: 'auto' };
+AI.videos = [];
+try { AI.mh = localStorage.getItem('lamsa-mh-key') || ''; } catch (e) { AI.mh = ''; }
+const docAspect = () => { const r = S.w / S.h; return r > 1.2 ? '16:9' : r < .83 ? '9:16' : '1:1'; };
+
+async function mhFetch(path, opts, signal) {
+  let r;
+  try { r = await fetch('https://api.magichour.ai' + path, { ...opts, signal, headers: { Authorization: 'Bearer ' + AI.mh, 'Content-Type': 'application/json' } }); }
+  catch (e) { if (signal && signal.aborted) throw { code: 'cancelled' }; throw { code: 'mh_net' }; }
+  let body = null; try { body = await r.json(); } catch (e) {}
+  if (!r.ok) throw { code: 'http', status: r.status, mh: true, detail: body && (body.message || body.error) };
+  return body;
+}
+async function mhUpload(blob, signal) {
+  const ext = blob.type.includes('png') ? 'png' : 'jpg';
+  const res = await mhFetch('/v1/files/upload-urls', { method: 'POST', body: JSON.stringify({ items: [{ type: 'image', extension: ext }] }) }, signal);
+  const it = res.items[0];
+  const put = await fetch(it.upload_url, { method: 'PUT', body: blob, signal });
+  if (!put.ok) throw { code: 'http', status: put.status, mh: true };
+  return it.file_path;
+}
+async function genMagicHour(en, img, signal) {
+  if (!AI.mh) throw { code: 'mh_key' };
+  const base = { name: 'Lamsa video', end_seconds: MV.dur, model: MV.model, resolution: MV.res };
+  AI.status = 'يرسل المهمة إلى Magic Hour…'; updateAIStatus();
+  const body = img
+    ? { ...base, assets: { image_file_path: await mhUpload(img, signal) }, style: { prompt: en || 'Natural cinematic motion with subtle camera movement' } }
+    : { ...base, aspect_ratio: docAspect(), style: { prompt: en } };
+  const job = await mhFetch(img ? '/v1/image-to-video' : '/v1/text-to-video', { method: 'POST', body: JSON.stringify(body) }, signal);
+  if (!job || !job.id) throw { code: 'mh_failed' };
+  const t0 = Date.now();
+  while (Date.now() - t0 < 600000) {
+    await sleep(3000, signal);
+    const p = await mhFetch('/v1/video-projects/' + job.id, {}, signal);
+    const el = Math.round((Date.now() - t0) / 1000);
+    if (p.status === 'complete') {
+      const url = (p.downloads && p.downloads[0] && p.downloads[0].url) || (p.download && p.download.url);
+      if (!url) throw { code: 'download' };
+      AI.status = 'يُنزّل الفيديو…'; AI.done = 95; updateAIStatus();
+      const r = await fetch(url, { signal }); if (!r.ok) throw { code: 'download' };
+      return r.blob();
+    }
+    if (p.status === 'error' || p.status === 'canceled') throw { code: 'mh_failed', detail: p.error && p.error.message };
+    AI.status = p.status === 'queued' ? `Magic Hour: المهمة في الانتظار… (${el} ث)` : `Magic Hour: يصنع الفيديو… (${el} ث)`;
+    AI.done = Math.min(90, 10 + el / 3); updateAIStatus();
+  }
+  throw { code: 'timeout' };
+}
+function hfRaw(e, signal) {
+  if (signal && signal.aborted) return { code: 'cancelled' };
+  if (e && e.code) return e;
+  const msg = String((e && e.message) || e);
+  if (/401|403|unauthori[sz]ed|invalid.*(token|credential)/i.test(msg)) return { code: 'http', status: 401, hf: true };
+  if (/402|payment|credit|quota/i.test(msg)) return { code: 'http', status: 402, hf: true };
+  return { code: 'hf_fail', detail: msg.slice(0, 200) };
+}
+async function genHFVideo(en, img, signal) {
+  if (!AI.hf) throw { code: 'hf_key' };
+  const hf = await loadHF(); let last = null;
+  const frames = Math.min(65, Math.max(25, Math.round(MV.dur * 10)));
+  for (const model of img ? HF_VIDEO_IMAGE : HF_VIDEO_TEXT) {
+    AI.status = `Hugging Face: يجرّب ${model.split('/')[1]}…`; AI.done = Math.max(AI.done, 15); updateAIStatus();
+    try {
+      const out = img
+        ? await hf.imageToVideo({ accessToken: AI.hf, provider: 'auto', model, inputs: img, parameters: { prompt: en, num_frames: frames } }, { signal })
+        : await hf.textToVideo({ accessToken: AI.hf, provider: 'auto', model, inputs: en, parameters: { num_frames: frames } }, { signal });
+      if (out && out.size) return out;
+    } catch (e) {
+      last = hfRaw(e, signal);
+      if (last.code === 'cancelled' || last.status === 401 || last.status === 402) throw last;
+    }
+  }
+  throw last && last.code !== 'hf_fail' ? last : { code: 'hf_video', detail: last && last.detail };
+}
+async function designBlob() {
+  const k = Math.min(1, 1280 / Math.max(S.w, S.h)), c = document.createElement('canvas');
+  c.width = Math.round(S.w * k); c.height = Math.round(S.h * k);
+  render(c.getContext('2d'), S, T, { anim: animPreview, selection: false, scale: k }); RS = 1;
+  return new Promise(r => c.toBlob(r, 'image/jpeg', .92));
+}
+function motionErr(e) {
+  const c = e && e.code;
+  if (c === 'mh_key') return 'أدخل مفتاح Magic Hour أولًا.';
+  if (c === 'mh_net') return 'تعذّر الاتصال بـ Magic Hour من المتصفح. جرّب مزوّد Hugging Face.';
+  if (e && e.mh && (e.status === 401 || e.status === 403)) return 'مفتاح Magic Hour غير صحيح.';
+  if (e && e.mh && (e.status === 402 || /credit/i.test(e.detail || ''))) return 'رصيد Magic Hour لا يكفي لهذا الفيديو.';
+  if (e && e.mh && e.status === 422) return 'رفض Magic Hour الإعدادات: ' + (e.detail || 'جرّب نموذجًا أو دقة أخرى.');
+  if (c === 'mh_failed') return 'لم ينجح Magic Hour في صنع الفيديو' + (e.detail ? ': ' + e.detail : '.');
+  if (c === 'timeout') return 'تأخر الفيديو أكثر من 10 دقائق. جرّب مدة أقصر.';
+  if (c === 'download') return 'اكتمل الفيديو لكن تعذّر تنزيله. حاول مرة أخرى.';
+  if (c === 'lib') return 'تعذّر تحميل مكتبة Hugging Face. تحقق من الإنترنت.';
+  if (c === 'hf_video') return 'لا يتوفر الآن نموذج فيديو على Hugging Face لحسابك. فعّل مزوّدي الاستدلال من إعدادات حسابك هناك.';
+  if (e && e.hf && e.status === 402) return 'رصيد Hugging Face لا يكفي. الفيديو يحتاج رصيدًا مدفوعًا.';
+  if (c === 'hf_fail') return 'تعذّر الطلب من Hugging Face: ' + (e.detail || '');
+  return aiErr(e);
+}
+async function genMotion() {
+  if (AI.busy) return;
+  const p = MV.prompt.trim();
+  const img = MV.src === 'design' ? await designBlob() : MV.src === 'upload' ? MV.srcBlob : null;
+  if (!p && !img) return needText('#mvPrompt');
+  if (MV.src === 'upload' && !img) { toast('اختر صورة البداية أولًا.'); return; }
+  const order = MV.provider === 'mh' ? ['mh'] : MV.provider === 'hf' ? ['hf'] : [AI.mh && 'mh', AI.hf && 'hf'].filter(Boolean);
+  if (!order.length) { toast('أدخل مفتاح Magic Hour أو Hugging Face أولًا.'); return; }
+  AI.busy = true; AI.ctl = new AbortController(); AI.done = 3; AI.total = 100; AI.status = 'يجهّز الوصف…'; renderTools();
+  let lastErr = null;
+  try {
+    const en = p ? await toEnglish(p, AI.ctl.signal) : '';
+    for (const prov of order) {
+      try {
+        let blob = prov === 'mh' ? await genMagicHour(en, img, AI.ctl.signal) : await genHFVideo(en, img, AI.ctl.signal);
+        if (!String(blob.type).startsWith('video/')) blob = new Blob([blob], { type: 'video/mp4' });
+        const m = await makeMedia('video', blob, 'فيديو · ' + (p || 'من صورة').slice(0, 30));
+        AI.videos.unshift(m.id);
+        toast('الفيديو جاهز. اضغط «إضافة» لوضعه في التصميم.');
+        return;
+      } catch (e) { if (e && (e.code === 'cancelled' || e.name === 'AbortError')) throw e; lastErr = e; }
+    }
+    toast(motionErr(lastErr));
+  } catch (e) { toast(motionErr(e)); }
+  finally { AI.busy = false; AI.ctl = null; AI.status = ''; AI.done = 0; if (tab === 'ai') renderTools(); }
+}
+function renderMotion(add) {
+  if (inClaude) {
+    add(sec('فيديو متحرك', h('p', { class: 'note' }, 'صفحة Claude لا تسمح بالاتصال بخدمات الفيديو الخارجية. افتح النسخة العامة لتوليد فيديو متحرك بمفتاح Magic Hour أو Hugging Face: ',
+      h('a', { href: PUBLIC_URL, target: '_blank', rel: 'noopener', style: 'color:var(--gold)' }, 'فتح النسخة العامة'))));
+    return;
+  }
+  const ta = h('textarea', { id: 'mvPrompt', dir: 'auto', rows: 4, value: MV.prompt, placeholder: 'مثال: الكاميرا تقترب ببطء من فانوس ذهبي يتمايل مع نسيم الليل', 'aria-label': 'وصف الفيديو' });
+  ta.addEventListener('input', () => { MV.prompt = ta.value; });
+  const pickSrc = () => pickFiles('image/*', false, f => { if (MV.srcUrl) URL.revokeObjectURL(MV.srcUrl); MV.srcBlob = f[0]; MV.srcUrl = URL.createObjectURL(f[0]); renderTools(); });
+  add(sec('وصف الحركة', h('p', { class: 'hint' }, 'فيديو بحركة حقيقية تولّده نماذج مثل LTX وWan وKling وVeo وSora، من النص أو من صورة بداية.'), ta,
+    ctlSeg('نقطة البداية', MV, 'src', [['none', 'من النص'], ['design', 'من تصميمي'], ['upload', 'من صورة']], () => { if (MV.src === 'upload' && !MV.srcBlob) pickSrc(); renderTools(); }),
+    MV.src === 'design' ? h('p', { class: 'hint' }, 'يصبح التصميم الظاهر الآن أول إطار في الفيديو، ثم يتحرك حسب الوصف.') : null,
+    MV.src === 'upload' && MV.srcUrl ? h('div', { class: 'ai-res' }, h('img', { src: MV.srcUrl, alt: 'صورة البداية' }), h('button', { class: 'btn', onclick: pickSrc }, 'تغيير الصورة')) : null,
+    ctlRange('المدة', MV, 'dur', 3, 10, 1, sec1)));
+  add(sec('المزوّد', ctlSeg(null, MV, 'provider', [['auto', 'تلقائي'], ['mh', 'Magic Hour'], ['hf', 'Hugging Face']], () => renderTools()),
+    MV.provider !== 'hf' ? [ctlSelect('نموذج Magic Hour', MV, 'model', MH_MODELS), ctlSeg('الدقة', MV, 'res', [['480p', '480p'], ['720p', '720p'], ['1080p', '1080p']]),
+      keyInput('مفتاح Magic Hour', 'mh', 'lamsa-mh-key', 'mh_...')] : null,
+    MV.provider !== 'mh' ? keyInput('مفتاح Hugging Face', 'hf', 'lamsa-hf-key', 'hf_...') : null,
+    h('p', { class: 'hint' }, 'توليد الفيديو المتحرك مدفوع لدى كل المزوّدين ويُخصم من رصيدك عندهم. «تلقائي» يجرّب Magic Hour ثم Hugging Face. المفاتيح تُحفظ في متصفحك فقط وتُرسل إلى المزوّد وحده.')));
+  add(sec(null, AI.busy
+    ? [h('div', { class: 'note busy' }, h('i'), h('span', { id: 'aiStatus' }, AI.status || 'جارِ التوليد…')), h('div', { class: 'progress' }, h('i', { id: 'aiBar' })),
+       h('button', { class: 'btn block', onclick: () => AI.ctl && AI.ctl.abort() }, 'إيقاف')]
+    : h('button', { class: 'btn gold block', onclick: genMotion }, icon('video'), 'صنع الفيديو المتحرك')));
+  const vids = AI.videos.map(id => media.get(id)).filter(Boolean);
+  add(sec('الفيديوهات', vids.length ? h('div', { class: 'grid2' }, vids.map(m => h('div', { class: 'ai-res' },
+    h('video', { src: m.url, controls: true, playsinline: true, preload: 'metadata', style: 'width:100%;border-radius:8px;display:block;background:var(--stage)' }),
+    h('div', { class: 'row2' },
+      h('button', { class: 'btn', onclick: async () => addMediaLayer(S.layers.some(l => l.mediaId === m.id) ? await cloneVideoMedia(m) : m) }, 'إضافة'),
+      h('button', { class: 'btn', onclick: () => saveFile(m.blob, `lamsa-video-${stamp()}.mp4`) }, 'تنزيل'))))) : h('p', { class: 'hint' }, 'ستظهر الفيديوهات المولّدة هنا.')));
+  setTimeout(updateAIStatus);
+}
+async function aiEditLayer(l, prompt, btn) {
+  if (!prompt.trim()) { toast('اكتب التعديل المطلوب أولًا.'); return; }
+  if (!AI.hf) { toast('أدخل مفتاح Hugging Face من تبويب «ذكاء» أولًا.'); return; }
+  const m = media.get(l.mediaId); if (!m) return;
+  btn.disabled = true; btn.textContent = 'يعدّل الصورة… قد يستغرق دقيقة';
+  try {
+    const hf = await loadHF(), en = await toEnglish(prompt);
+    const out = await hf.imageToImage({ accessToken: AI.hf, provider: 'auto', model: 'Qwen/Qwen-Image-Edit', inputs: m.blob, parameters: { prompt: en } });
+    const nm = await makeMedia('image', out, m.name);
+    l.mediaId = nm.id; commit(); requestDraw(); renderProps();
+    toast('عُدّلت الصورة. اضغط تراجع للعودة إلى الأصل.');
+  } catch (e) { toast(motionErr(hfRaw(e))); btn.disabled = false; btn.textContent = 'تعديل بالذكاء الاصطناعي'; }
 }
 
 /* ---------- UI: properties panel ---------- */
@@ -1551,6 +1727,12 @@ function renderProps() {
         h('button', { class: 'btn', onclick: () => { Object.assign(l, { x: S.w / 2, y: S.h / 2, w: S.w, h: S.h, rot: 0 }); commit(); requestDraw(); } }, 'ملء الصفحة'),
         h('button', { class: 'btn', onclick: () => { const k = Math.min(S.w / m.w, S.h / m.h); Object.assign(l, { x: S.w / 2, y: S.h / 2, w: m.w * k, h: m.h * k, rot: 0 }); commit(); requestDraw(); } }, 'احتواء كامل')),
       ctlToggle('إطار حول الصورة', l.border, 'on', rp), l.border.on ? [ctlColor('لون الإطار', l.border, 'color'), ctlRange('سماكة الإطار', l.border, 'w', 1, 60, 1)] : null));
+    if (l.type === 'image' && !inClaude) {
+      const et = h('textarea', { dir: 'auto', rows: 2, placeholder: 'مثال: اجعل الخلفية ليلية مع إضاءة ذهبية', 'aria-label': 'التعديل المطلوب' });
+      const eb = h('button', { class: 'btn block' }, 'تعديل بالذكاء الاصطناعي');
+      eb.addEventListener('click', () => aiEditLayer(l, et.value, eb));
+      add(sec('تعديل بالذكاء الاصطناعي', h('p', { class: 'hint' }, 'صف التغيير المطلوب فيعدّله نموذج Qwen Image Edit على Hugging Face بمفتاحك.'), et, eb));
+    }
     if (l.type === 'video') add(sec('الفيديو',
       h('div', { class: 'note' }, `طول المقطع ${fmtT(m.dur)}`),
       ctlRange('بداية المقطع (قص من الأول)', l, 'trim', 0, Math.max(0, Math.floor((m.dur - .5) * 10) / 10), .1, sec1),
