@@ -116,6 +116,15 @@ textarea{resize:vertical;min-height:84px;line-height:1.6}
 .grads button{aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--g);padding:0}
 .media-thumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--stage);padding:0}
 .media-thumb img,.media-thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.ai-res{display:grid;gap:6px;padding:6px;border-radius:12px;border:1px solid var(--line);background:var(--raise)}
+.ai-res img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block;background:var(--stage)}
+.ai-res .row2 .btn{padding:6px 8px;font-size:12.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{padding:5px 10px;border-radius:20px;border:1px solid var(--line);background:var(--raise);font-size:12.5px;color:var(--muted)}
+.chips button:hover{color:var(--fg);border-color:var(--gold)}
+.busy{display:flex;align-items:center;gap:10px}
+.busy i{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--gold);animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
 .media-thumb em{position:absolute;inset-inline-start:4px;bottom:4px;font-style:normal;font-size:10.5px;padding:1px 6px;border-radius:6px;background:rgb(0 0 0 / .6);color:#fff}
 
 /* layers list */
@@ -308,7 +317,8 @@ const ICONS = {
   video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/>',
   music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
   film: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 8h4M3 16h4M17 8h4M17 16h4"/>',
-  plus: '<path d="M12 5v14M5 12h14"/>', close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  ai: '<path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9L11 3Z"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"/>', close: '<path d="M6 6l12 12M18 6 6 18"/>',
   shape: '<path d="m12 3 2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7L12 3Z"/>',
   image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
   flipx: '<path d="M12 3v18M9 7 4 12l5 5V7ZM15 7l5 5-5 5V7Z"/>',
@@ -1044,7 +1054,7 @@ const pct = v => Math.round(v * 100) + '٪';
 const sec1 = v => (+v).toFixed(1) + ' ث';
 
 /* ---------- UI: tools panel ---------- */
-const TABS = [['templates', 'قوالب', 'templates'], ['text', 'نص', 'text'], ['media', 'وسائط', 'media'], ['shapes', 'أشكال', 'shapes'], ['bg', 'خلفية', 'bg'], ['layers', 'طبقات', 'layers'], ['props', 'تعديل', 'props']];
+const TABS = [['templates', 'قوالب', 'templates'], ['ai', 'ذكاء', 'ai'], ['text', 'نص', 'text'], ['media', 'وسائط', 'media'], ['shapes', 'أشكال', 'shapes'], ['bg', 'خلفية', 'bg'], ['layers', 'طبقات', 'layers'], ['props', 'تعديل', 'props']];
 function renderRail() {
   $('#rail').replaceChildren(...TABS.map(([id, t, ic]) => h('button', { class: id === 'props' ? 'only-m' : null, 'aria-current': String(tab === id), onclick: () => setTab(id) }, icon(ic), t)));
 }
@@ -1078,6 +1088,8 @@ function renderTools() {
       h('button', { class: 'btn block', onclick: () => { sel = null; T = 0; loadDoc(newDoc(S.w, S.h)); commit(); toast('بدأت تصميمًا جديدًا. اضغط تراجع لاستعادة السابق.'); } }, icon('plus'), 'صفحة جديدة بالمقاس الحالي'),
       h('div', { class: 'row2' }, ctlNum('العرض (بكسل)', cw, 'w', 100, 4000), ctlNum('الارتفاع (بكسل)', cw, 'h', 100, 4000)),
       h('button', { class: 'btn block', id: 'customSizeBtn', onclick: () => setSize(clamp(Math.round(cw.w), 100, 4000), clamp(Math.round(cw.h), 100, 4000)) }, 'تطبيق المقاس المخصص')));
+  } else if (tab === 'ai') {
+    renderAI(add);
   } else if (tab === 'text') {
     add(h('h2', { class: 'ptitle' }, 'النصوص'), h('p', { class: 'psub' }, 'اثنا عشر خطًا عربيًا، مع تعبئة ذهبية وظلال وحركات.'));
     add(sec('إضافة نص',
@@ -1165,6 +1177,152 @@ function layerName(l) {
   if (l.type === 'text') return (String(l.text).split('\n')[0] || 'نص').slice(0, 28);
   if (l.type === 'shape') return SHAPE_NAMES[l.shape] || 'شكل';
   const m = media.get(l.mediaId); return (m && m.name) ? `${TYPE_NAMES[l.type]} · ${m.name}` : TYPE_NAMES[l.type];
+}
+
+
+/* ---------- AI image generation ---------- */
+const PUBLIC_URL = 'https://raw.githack.com/abdulrahmanahmedelabed-prog/quran-ai/__SHA__/studio/index.html';
+const inClaude = !!(window.claude && typeof window.claude.use === 'function');
+const sampleCap = inClaude ? window.claude.use('sample').catch(() => null) : Promise.resolve(null);
+let aiSample = null;
+sampleCap.then(sm => { aiSample = sm; if (tab === 'ai') renderTools(); });
+const AI_STYLES = [
+  ['photo', 'واقعي', 'photorealistic, professional photography, 85mm lens, natural light, ultra detailed, sharp focus'],
+  ['cinema', 'سينمائي', 'cinematic film still, dramatic lighting, anamorphic lens, rich color grading, atmospheric'],
+  ['luxury', 'فخم', 'luxury premium aesthetic, black and gold palette, elegant studio lighting, refined details'],
+  ['islamic', 'فن إسلامي', 'islamic geometric art, arabesque patterns, gold leaf, intricate ornament, elegant symmetry'],
+  ['oil', 'رسم زيتي', 'classical oil painting, visible brushstrokes, fine art, museum quality'],
+  ['water', 'ألوان مائية', 'watercolor painting, soft washes, delicate paper texture'],
+  ['anime', 'أنمي', 'anime illustration, vibrant colors, detailed background, studio quality'],
+  ['3d', 'ثلاثي الأبعاد', '3d render, soft global illumination, glossy materials, octane render'],
+  ['flat', 'رسم مسطح', 'flat vector illustration, minimal clean shapes, modern palette'],
+];
+const AI_IDEAS = ['فانوس رمضان ذهبي في ليلة مقمرة', 'مسجد عند الغروب بإضاءة سينمائية', 'زجاجة عطر فاخرة على رخام أسود', 'صحراء وجمال تحت سماء مليئة بالنجوم', 'فنجان قهوة عربية ودلّة على طاولة خشبية'];
+const AI = { prompt: '', style: 'photo', engine: inClaude ? 'claude' : 'flux', count: 1, busy: false, status: '', ctl: null, results: [], key: '' };
+try { AI.key = localStorage.getItem('lamsa-ai-key') || ''; } catch (e) {}
+function aiSize() {
+  const k = 1024 / Math.max(S.w, S.h);
+  return [Math.max(256, Math.round(S.w * k / 64) * 64), Math.max(256, Math.round(S.h * k / 64) * 64)];
+}
+async function genFlux(prompt, style, w, hh, seed, signal) {
+  let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt + ', ' + style)}?width=${w}&height=${hh}&seed=${seed}&model=flux&nologo=true&enhance=true&safe=true`;
+  if (AI.key) url += '&token=' + encodeURIComponent(AI.key);
+  const r = await fetch(url, { signal });
+  if (!r.ok) throw { code: 'http', status: r.status };
+  const b = await r.blob();
+  if (!b.type.startsWith('image/')) throw { code: 'http' };
+  return b;
+}
+function cleanSvg(text, w, hh) {
+  const m = String(text).match(/<svg[\s\S]*<\/svg>/i); if (!m) throw { code: 'empty_completion' };
+  const doc = new DOMParser().parseFromString(m[0], 'image/svg+xml');
+  const root = doc.documentElement;
+  if (doc.querySelector('parsererror') || root.nodeName.toLowerCase() !== 'svg') throw { code: 'bad_svg' };
+  doc.querySelectorAll('script,foreignObject,iframe').forEach(n => n.remove());
+  doc.querySelectorAll('*').forEach(n => {
+    for (const a of [...n.attributes]) {
+      if (/^on/i.test(a.name)) n.removeAttribute(a.name);
+      else if (/href$/i.test(a.name) && !/^#/.test(a.value) && !/^data:image\//.test(a.value)) n.removeAttribute(a.name);
+    }
+  });
+  root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  if (!root.getAttribute('viewBox')) root.setAttribute('viewBox', `0 0 ${w} ${hh}`);
+  root.setAttribute('width', w); root.setAttribute('height', hh);
+  return new XMLSerializer().serializeToString(root);
+}
+async function svgToPng(svg, w, hh) {
+  const svgBlob = new Blob([svg], { type: 'image/svg+xml' }), url = URL.createObjectURL(svgBlob);
+  try {
+    const img = new Image(); img.src = url; await img.decode();
+    const c = document.createElement('canvas'); c.width = w * 2; c.height = hh * 2;
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const png = await new Promise(r => c.toBlob(r, 'image/png'));
+    return png || svgBlob;
+  } catch (e) { return svgBlob; } finally { URL.revokeObjectURL(url); }
+}
+async function genClaude(prompt, style, w, hh, signal, onLen) {
+  const ask = `You are a world-class illustrator who paints with SVG. Create ONE finished, gallery-quality illustration.
+Subject (the user may write in Arabic): ${prompt}
+Style: ${style}
+Canvas: width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}".
+Rules:
+- Fill the entire canvas with a complete, rich background; leave no empty areas.
+- Build depth with many layered shapes, linearGradient and radialGradient fills, soft shadows (feGaussianBlur), highlights, and subtle texture (feTurbulence) where it helps.
+- Strong composition with a clear focal point, a harmonious palette, and fine detail.
+- No text or letters unless the subject explicitly asks for words.
+- No <script>, no <foreignObject>, no external images, fonts or links.
+Output only the SVG markup, starting with <svg and ending with </svg>. No explanation and no code fence.`;
+  const { text } = await aiSample(ask, { signal, modelTier: 'default', cache: false, onText: ({ text }) => onLen(text.length) });
+  const svg = cleanSvg(text, w, hh);
+  return svgToPng(svg, w, hh);
+}
+function aiErr(e) {
+  const c = e && e.code;
+  if (c === 'cancelled' || (e && e.name === 'AbortError')) return 'أُوقف التوليد.';
+  if (c === 'not_granted') return 'لم تسمح للصفحة باستخدام Claude. أعد المحاولة واضغط سماح.';
+  if (c === 'rate_limited' || c === 'queue_overflow' || (c === 'http' && e.status === 429)) return 'طلبات كثيرة في وقت قصير. انتظر دقيقة ثم أعد المحاولة.';
+  if (c === 'refused') return 'لا يمكن توليد هذا الوصف. جرّب وصفًا آخر.';
+  if (c === 'bad_svg' || c === 'empty_completion') return 'خرجت الصورة ناقصة. اضغط توليد مرة أخرى.';
+  if (c === 'http' || (e instanceof TypeError)) return 'تعذّر الوصول إلى خدمة الصور المجانية. تحقق من الإنترنت أو جرّب بعد قليل.';
+  return 'تعذّر التوليد. حاول مرة أخرى.';
+}
+async function aiGenerate() {
+  const prompt = AI.prompt.trim();
+  if (!prompt) { toast('اكتب وصف الصورة أولًا.'); $('#aiPrompt') && $('#aiPrompt').focus(); return; }
+  if (AI.busy) return;
+  const st = AI_STYLES.find(x => x[0] === AI.style)[2], [w, hh] = aiSize();
+  AI.busy = true; AI.ctl = new AbortController(); renderTools();
+  const n = AI.engine === 'flux' ? AI.count : 1;
+  let made = 0;
+  try {
+    for (let i = 0; i < n; i++) {
+      AI.status = AI.engine === 'flux' ? `يرسم الصورة ${i + 1} من ${n}…` : 'Claude يفكّر في التكوين…'; updateAIStatus();
+      const blob = AI.engine === 'flux'
+        ? await genFlux(prompt, st, w, hh, Math.floor(Math.random() * 1e9), AI.ctl.signal)
+        : await genClaude(prompt, st, w, hh, AI.ctl.signal, len => { AI.status = `Claude يرسم… ${(len / 1000).toFixed(1)} ألف حرف`; updateAIStatus(); });
+      const m = await makeMedia('image', blob, prompt.slice(0, 40));
+      AI.results.unshift({ id: m.id, prompt }); made++;
+      if (tab === 'ai') renderTools();
+    }
+    toast(made > 1 ? `جهزت ${made} صور. اضغط «إضافة» لوضعها في التصميم.` : 'جهزت الصورة. اضغط «إضافة» لوضعها في التصميم.');
+  } catch (e) { toast(aiErr(e)); }
+  finally { AI.busy = false; AI.ctl = null; AI.status = ''; if (tab === 'ai') renderTools(); }
+}
+function updateAIStatus() { const el = $('#aiStatus'); if (el) el.textContent = AI.status; }
+function renderAI(add) {
+  const claudeOk = !!aiSample, fluxOk = !inClaude;
+  if (AI.engine === 'claude' && !claudeOk && fluxOk) AI.engine = 'flux';
+  if (AI.engine === 'flux' && !fluxOk) AI.engine = 'claude';
+  add(h('h2', { class: 'ptitle' }, 'التوليد بالذكاء الاصطناعي'), h('p', { class: 'psub' }, 'اكتب ما تتخيله بالعربية أو الإنجليزية، وتظهر الصورة جاهزة للإضافة إلى تصميمك.'));
+  const ta = h('textarea', { id: 'aiPrompt', dir: 'auto', rows: 4, value: AI.prompt, placeholder: 'مثال: فانوس رمضان ذهبي معلق فوق شارع قديم في القاهرة ليلًا', 'aria-label': 'وصف الصورة' });
+  ta.addEventListener('input', () => { AI.prompt = ta.value; });
+  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) aiGenerate(); });
+  add(sec('الوصف', ta, h('div', { class: 'chips' }, AI_IDEAS.map(t => h('button', { type: 'button', onclick: () => { AI.prompt = t; ta.value = t; } }, t)))));
+  add(sec('الأسلوب', ctlSeg(null, AI, 'style', AI_STYLES.map(([k, n]) => [k, n]))));
+  const engines = [];
+  if (fluxOk) engines.push(['flux', 'صور واقعية · Flux']);
+  if (claudeOk) engines.push(['claude', 'رسم فني · Claude']);
+  add(sec('المحرّك',
+    engines.length > 1 ? ctlSeg(null, AI, 'engine', engines, () => renderTools()) : null,
+    AI.engine === 'flux' && fluxOk ? [
+      h('p', { class: 'hint' }, 'محرك Flux المجاني عبر خدمة Pollinations. يرسم صورًا واقعية بجودة عالية، ويحتاج اتصالًا بالإنترنت.'),
+      ctlSeg('عدد الصور', AI, 'count', [[1, '1'], [2, '2'], [4, '4']]),
+      h('details', {}, h('summary', { class: 'hint', style: 'cursor:pointer' }, 'مفتاح Pollinations (اختياري، لسرعة أعلى)'),
+        (() => { const k = h('input', { type: 'text', value: AI.key, dir: 'ltr', placeholder: 'اتركه فارغًا للاستخدام المجاني', 'aria-label': 'مفتاح Pollinations' });
+          k.addEventListener('change', () => { AI.key = k.value.trim(); try { localStorage.setItem('lamsa-ai-key', AI.key); } catch (e) {} }); return k; })()),
+    ] : null,
+    AI.engine === 'claude' && claudeOk ? h('p', { class: 'hint' }, 'Claude يرسم لوحة فنية متجهية مفصّلة بالتدرّجات والظلال. أنسب للرسوم والشعارات والخلفيات الزخرفية منه للصور الفوتوغرافية. يستغرق عادة بين نصف دقيقة ودقيقتين.') : null,
+    !engines.length ? h('p', { class: 'note' }, 'جارِ تجهيز محرك الذكاء الاصطناعي…') : null,
+    inClaude ? h('p', { class: 'note' }, 'للصور الواقعية بمحرك Flux افتح النسخة العامة من البرنامج: ', h('a', { href: PUBLIC_URL, target: '_blank', rel: 'noopener', style: 'color:var(--gold)' }, 'فتح النسخة العامة')) : null));
+  add(sec(null, AI.busy
+    ? [h('div', { class: 'note busy' }, h('i'), h('span', { id: 'aiStatus' }, AI.status || 'جارِ التوليد…')), h('button', { class: 'btn block', onclick: () => AI.ctl && AI.ctl.abort() }, 'إيقاف')]
+    : h('button', { class: 'btn gold block', disabled: !engines.length, onclick: aiGenerate }, icon('ai'), `توليد بمقاس ${dim(...aiSize())}`)));
+  const res = AI.results.filter(r => media.has(r.id));
+  if (res.length) add(sec('النتائج', h('div', { class: 'grid2' }, res.map(r => { const m = media.get(r.id);
+    return h('div', { class: 'ai-res' }, h('img', { src: m.url, alt: r.prompt, title: r.prompt }),
+      h('div', { class: 'row2' },
+        h('button', { class: 'btn', onclick: () => addMediaLayer(m) }, 'إضافة'),
+        h('button', { class: 'btn', onclick: () => { S.bg.type = 'image'; S.bg.mediaId = m.id; commit(); requestDraw(); toast('أصبحت الصورة خلفية التصميم.'); } }, 'خلفية'))); }))));
 }
 
 /* ---------- UI: properties panel ---------- */
