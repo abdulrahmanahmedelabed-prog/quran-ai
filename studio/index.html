@@ -1224,7 +1224,9 @@ async function withRetry(fn, signal) {
   }
 }
 async function genFlux(prompt, style, w, hh, seed, signal) {
-  let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt + ', ' + style)}?width=${w}&height=${hh}&seed=${seed}&model=flux&nologo=true&enhance=true&safe=true`;
+  // Flux does not understand Arabic: an untranslated prompt yields an unrelated picture, so never send one.
+  const en = await toEnglish(prompt, signal);
+  let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(en + ', ' + style)}?width=${w}&height=${hh}&seed=${seed}&model=flux&nologo=true&safe=true`;
   if (AI.key) url += '&token=' + encodeURIComponent(AI.key);
   const r = await fetch(url, { signal });
   if (!r.ok) throw { code: 'http', status: r.status };
@@ -1239,13 +1241,26 @@ async function toEnglish(text, signal) {
   if (trCache.has(text)) return trCache.get(text);
   const ask = 'Translate this image description into fluent, vivid English for an image generator. Output only the translation.\n\n' + text;
   let out = '';
-  try {
-    if (aiSample) out = (await aiSample(ask, { modelTier: 'quick', signal })).text;
-    else { const r = await fetch('https://text.pollinations.ai/' + encodeURIComponent(ask), { signal }); if (r.ok) out = await r.text(); }
-  } catch (e) { if (e && e.code === 'cancelled') throw e; }
+  if (aiSample) { try { out = (await aiSample(ask, { modelTier: 'quick', signal })).text; } catch (e) { if (e && e.code === 'cancelled') throw e; } }
   out = (out || '').trim();
+  if (!out || isAr(out)) out = await translateFree(text, signal);
   if (!out || isAr(out)) throw { code: 'translate' };
   trCache.set(text, out); return out;
+}
+/* Free translators tried in order; each one may be down or rate limited. */
+async function translateFree(text, signal) {
+  const tries = [
+    async () => { const r = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text), { signal });
+      const j = await r.json(); return j[0].map(x => x[0]).join(''); },
+    async () => { const r = await fetch('https://api.mymemory.translated.net/get?langpair=ar|en&q=' + encodeURIComponent(text.slice(0, 480)), { signal });
+      const j = await r.json(); const t = j.responseData && j.responseData.translatedText; return /MYMEMORY|QUERY LENGTH/i.test(t || '') ? '' : t; },
+    async () => { const r = await fetch('https://text.pollinations.ai/' + encodeURIComponent('Translate to English. Output only the translation:\n' + text), { signal }); return r.ok ? r.text() : ''; },
+  ];
+  for (const t of tries) {
+    try { const out = String((await t()) || '').trim(); if (out && !isAr(out)) return out; }
+    catch (e) { if (signal && signal.aborted) throw { code: 'cancelled' }; }
+  }
+  return '';
 }
 async function genHF(prompt, style, w, hh, seed, signal) {
   if (!AI.hf) throw { code: 'hf_key' };
@@ -1341,7 +1356,7 @@ async function runJobs(prompts, label) {
       try { const blob = await genImage(p, AI.ctl.signal); out.push(addResult(blob, p)); }
       catch (e) {
         if (e && (e.code === 'cancelled' || e.name === 'AbortError')) throw e;
-        if (e && (e.code === 'hf_key' || e.code === 'not_granted' || (e.hf && [401, 402, 403].includes(e.status)))) throw e;
+        if (e && (e.code === 'hf_key' || e.code === 'translate' || e.code === 'not_granted' || (e.hf && [401, 402, 403].includes(e.status)))) throw e;
         fails++; lastErr = e;
       }
       AI.done++; updateAIStatus();
@@ -1378,15 +1393,20 @@ Return only a JSON array of ${n} objects: [{"caption": "short Arabic caption, ma
     else { const r = await fetch('https://text.pollinations.ai/' + encodeURIComponent(ask), { signal }); if (r.ok) text = await r.text(); }
     const m = text.match(/\[[\s\S]*\]/);
     const arr = m ? JSON.parse(m[0]) : null;
-    if (Array.isArray(arr) && arr.length) return arr.slice(0, n).map(s => ({ caption: String(s.caption || ''), prompt: String(s.prompt || s.caption || story) }));
+    if (Array.isArray(arr) && arr.length >= Math.min(2, n) && arr.every(x => x && x.prompt && !isAr(String(x.prompt))))
+      return arr.slice(0, n).map(x => ({ caption: String(x.caption || ''), prompt: String(x.prompt) }));
   } catch (e) { if (e && e.code === 'cancelled') throw e; }
-  // Fallback without a writer: each sentence of the idea becomes a scene.
-  const parts = story.split(/[\n.!؟?،]+/).map(s => s.trim()).filter(Boolean);
-  const src = parts.length ? parts : [story];
-  return Array.from({ length: Math.min(n, Math.max(src.length, 1)) }, (_, i) => ({ caption: src[i % src.length], prompt: src[i % src.length] + ', ' + story }));
+  // Fallback without a scene writer: the whole idea in English, framed with a different shot for each scene.
+  const en = await toEnglish(story, signal);
+  const shots = ['wide establishing shot', 'medium shot', 'close-up detail shot', 'aerial drone view', 'low angle shot', 'tracking side view', 'over the shoulder view', 'silhouette against the sky', 'wide final shot'];
+  const parts = story.split(/[\n.!؟?،]+|\s(?:ثم|حتى)\s/).map(x => x.trim()).filter(Boolean);
+  return Array.from({ length: n }, (_, i) => ({
+    caption: parts.length > 1 ? (parts[Math.floor(i * parts.length / n)] || '') : (i === 0 ? story : ''),
+    prompt: `${en}, scene ${i + 1} of ${n}, ${shots[i % shots.length]}, ${i < n / 3 ? 'beginning of the journey' : i < 2 * n / 3 ? 'middle of the journey' : 'end of the journey'}` }));
 }
 async function makeStoryVideo() {
   const story = AI.story.trim(); if (!story) return needText('#aiStory');
+  AI.story_ready = null;
   AI.busy = true; AI.ctl = new AbortController(); AI.done = 0; AI.total = AI.scenes; AI.status = 'يكتب المشاهد…'; renderTools();
   let scenes;
   try { scenes = await planScenes(story, AI.scenes, AI.ctl.signal); }
@@ -1400,11 +1420,15 @@ async function makeStoryVideo() {
   D.duration = Math.min(600, ms.length * per);
   D.layers = ms.map((m, i) => mkMedia(D, 'image', m, { w: D.w, h: D.h,
     anim: { in: 'fade', dur: .8, start: i * per, end: i < ms.length - 1 ? (i + 1) * per + .8 : null, loop: 'kenburns' } }));
-  if (AI.captions) caps.forEach((c, i) => { if (c) D.layers.push(mkText(D, { text: c, font: 'Tajawal', size: Math.round(D.w * .05), y: D.h * .84,
+  // A caption shared by consecutive scenes is shown once, spanning all of them.
+  if (AI.captions) caps.forEach((c, i) => { if (!c || c === caps[i - 1]) return; let j = i; while (caps[j + 1] === c) j++; D.layers.push(mkText(D, { text: c, font: 'Tajawal', size: Math.round(D.w * .05), y: D.h * .84,
     box: { on: true, color: '#000000', alpha: .55, pad: Math.round(D.w * .02), radius: 14 },
-    anim: { in: 'up', out: 'fade', dur: .6, start: i * per + .4, end: Math.min(D.duration, (i + 1) * per - .1) } })); });
+    anim: { in: 'up', out: 'fade', dur: .6, start: i * per + .4, end: Math.min(D.duration, (j + 1) * per - .1) } })); });
   sel = null; T = 0; animPreview = true; loadDoc(D); commit();
-  toast(`الفيديو جاهز: ${ms.length} مشاهد. اضغط تشغيل للمعاينة أو تصدير لحفظه MP4.`);
+  AI.story_ready = { scenes: ms.length, dur: D.duration };
+  if (tab === 'ai') renderTools();
+  play();
+  toast(`الفيديو جاهز: ${ms.length} مشاهد · ${fmtT(D.duration)}. احفظه بزر «حفظ الفيديو MP4».`);
 }
 
 let jszipP = null;
@@ -1471,7 +1495,12 @@ function renderAI(add) {
     const ta = h('textarea', { id: 'aiStory', dir: 'auto', rows: 5, value: AI.story, placeholder: 'مثال: رحلة قافلة عبر الصحراء من الفجر حتى تصل إلى واحة عند الغروب', 'aria-label': 'فكرة الفيديو' });
     ta.addEventListener('input', () => { AI.story = ta.value; });
     add(sec('فكرة الفيديو', h('p', { class: 'hint' }, 'يقسّم الذكاء الاصطناعي الفكرة إلى مشاهد، ويرسم صورة لكل مشهد، ثم يحرّكها بزووم سينمائي وانتقالات وتعليق عربي. أضف موسيقى من تبويب الوسائط ثم صدّر MP4.'),
-      ta, ctlRange('عدد المشاهد', AI, 'scenes', 2, 20, 1), ctlRange('مدة كل مشهد', AI, 'sceneSec', 2, 10, .5, sec1), ctlToggle('تعليق مكتوب على كل مشهد', AI, 'captions')));
+      ta, ctlRange('عدد المشاهد', AI, 'scenes', 2, 20, 1), ctlRange('مدة كل مشهد', AI, 'sceneSec', 2, 10, .5, sec1), ctlToggle('تعليق مكتوب على كل مشهد', AI, 'captions'),
+      h('p', { class: 'hint' }, 'هذا الوضع مجاني ويصنع فيديو من مشاهد مرسومة تتحرك بالكاميرا. لحركة حقيقية داخل المشهد استخدم «فيديو متحرك».')));
+    if (AI.story_ready && !AI.busy) add(sec('الفيديو جاهز', h('div', { class: 'note' }, `${AI.story_ready.scenes} مشاهد · ${fmtT(AI.story_ready.dur)} · يظهر الآن في مساحة التصميم`),
+      h('div', { class: 'row2' },
+        h('button', { class: 'btn', onclick: () => { T = 0; play(); } }, icon('play'), 'تشغيل'),
+        h('button', { class: 'btn gold', onclick: () => { openExport(); exportVideo(); } }, icon('download'), 'حفظ الفيديو MP4'))));
   }
   add(sec('الأسلوب', ctlSeg(null, AI, 'style', AI_STYLES.map(([k, n]) => [k, n]))));
   add(sec('المحرّك',
